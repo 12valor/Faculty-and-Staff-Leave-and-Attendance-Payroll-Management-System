@@ -1,6 +1,21 @@
-﻿import { ModulePlaceholder } from "@/components/module-placeholder";
-import { moduleMetadata } from "@/lib/navigation";
+import { PageTitle } from "@/components/page-title";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
+import { LeaveManager } from "@/features/leave/components/leave-manager";
+import type { LeaveStatus, LeaveType } from "@/generated/prisma/client";
+import { getPrisma } from "@/lib/prisma";
 
-export default function LeavePage() {
-  return <ModulePlaceholder {...moduleMetadata.leave} />;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+export default async function LeavePage({ searchParams }: { searchParams: SearchParams }) {
+  const params = await searchParams; const employeeId = value(params.employee); const departmentId = value(params.department); const leaveType = value(params.type) as LeaveType | undefined; const status = value(params.status) as LeaveStatus | undefined; const from = value(params.from); const to = value(params.to);
+  const [employees, departments, records, balances, transactions] = await Promise.all([
+    getPrisma().employee.findMany({ where: { employmentStatus: "ACTIVE" }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
+    getPrisma().department.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
+    getPrisma().leaveRecord.findMany({ where: { employeeId, leaveType, status, startDate: to ? { lte: to } : undefined, endDate: from ? { gte: from } : undefined, employee: { departmentId } }, include: { employee: { include: { department: true } } }, orderBy: [{ createdAt: "desc" }] }),
+    getPrisma().leaveBalance.findMany({ where: { employee: { departmentId, employmentStatus: { not: "ARCHIVED" } } }, include: { employee: { include: { department: true } } }, orderBy: { employee: { lastName: "asc" } } }),
+    getPrisma().leaveTransaction.findMany({ where: { employee: { departmentId }, employeeId }, include: { employee: true }, orderBy: { createdAt: "desc" }, take: 300 }),
+  ]);
+  return <section className="flex flex-col gap-6"><PageTitle title="Leave Management" description="Encode Admin-managed leave, maintain balances, and generate monthly CSC leave credits." /><form className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-4 xl:grid-cols-7"><Input type="date" name="from" defaultValue={from} aria-label="From date" /><Input type="date" name="to" defaultValue={to} aria-label="To date" /><NativeSelect name="employee" defaultValue={employeeId ?? ""} className="w-full"><NativeSelectOption value="">All employees</NativeSelectOption>{employees.map((employee) => <NativeSelectOption key={employee.id} value={employee.id}>{employee.employeeNumber} · {employee.lastName}</NativeSelectOption>)}</NativeSelect><NativeSelect name="department" defaultValue={departmentId ?? ""} className="w-full"><NativeSelectOption value="">All departments</NativeSelectOption>{departments.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}</NativeSelect><NativeSelect name="type" defaultValue={leaveType ?? ""} className="w-full"><NativeSelectOption value="">All leave types</NativeSelectOption>{["VACATION", "SICK", "LEAVE_WITHOUT_PAY", "OTHER"].map((item) => <NativeSelectOption key={item} value={item}>{item.replaceAll("_", " ")}</NativeSelectOption>)}</NativeSelect><NativeSelect name="status" defaultValue={status ?? ""} className="w-full"><NativeSelectOption value="">All statuses</NativeSelectOption>{["PENDING", "APPROVED", "REJECTED", "CANCELLED"].map((item) => <NativeSelectOption key={item} value={item}>{item}</NativeSelectOption>)}</NativeSelect><Button type="submit">Apply filters</Button></form><LeaveManager employees={employees.map((employee) => ({ id: employee.id, label: `${employee.employeeNumber} · ${employee.lastName}, ${employee.firstName}` }))} records={records.map((row) => ({ id: row.id, employee: `${row.employee.lastName}, ${row.employee.firstName}`, department: row.employee.department.name, leaveType: row.leaveType, status: row.status, startDate: row.startDate, endDate: row.endDate, numberOfDays: Number(row.numberOfDays), paidDays: Number(row.paidDays), unpaidDays: Number(row.unpaidDays), reason: row.reason ?? "" }))} balances={balances.map((row) => ({ employee: `${row.employee.lastName}, ${row.employee.firstName}`, department: row.employee.department.name, vacation: Number(row.vacationBalance), sick: Number(row.sickBalance) }))} transactions={transactions.map((row) => ({ id: row.id, employee: `${row.employee.lastName}, ${row.employee.firstName}`, createdAt: row.createdAt.toISOString().slice(0, 10), transactionType: row.transactionType, leaveType: row.leaveType, amount: Number(row.amount), balanceAfter: Number(row.balanceAfter), description: row.description ?? "" }))} /></section>;
 }
+function value(input: string | string[] | undefined) { return typeof input === "string" && input ? input : undefined; }

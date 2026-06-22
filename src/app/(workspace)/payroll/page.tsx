@@ -1,6 +1,8 @@
-﻿import { ModulePlaceholder } from "@/components/module-placeholder";
-import { moduleMetadata } from "@/lib/navigation";
+import { PageTitle } from "@/components/page-title";
+import { PayrollManager } from "@/features/payroll/components/payroll-manager";
+import { getPrisma } from "@/lib/prisma";
 
-export default function PayrollPage() {
-  return <ModulePlaceholder {...moduleMetadata.payroll} />;
+export default async function PayrollPage() {
+  const periods = await getPrisma().payrollPeriod.findMany({ include: { deductions: { include: { employee: true, breakdowns: true }, orderBy: { employee: { lastName: "asc" } } } }, orderBy: { startDate: "desc" } });
+  return <section className="flex flex-col gap-6"><PageTitle title="Payroll Deductions" description="Create periods, preview attendance and LWOP deductions, regenerate drafts, and lock final payroll." /><PayrollManager periods={periods.map((period) => ({ id: period.id, name: period.name, startDate: period.startDate, endDate: period.endDate, status: period.status, totalAmount: period.deductions.reduce((sum, row) => sum + Number(row.amount), 0), employeeCount: period.deductions.length, deductions: period.deductions.map((row) => ({ employeeId: row.employeeId, employee: `${row.employee.lastName}, ${row.employee.firstName}`, monthlySalary: Number(row.monthlySalary), dailyRate: Number(row.dailyRate), totalLateMinutes: row.totalLateMinutes, totalUndertimeMinutes: row.totalUndertimeMinutes, absenceDays: Number(row.absenceDays), lwopDays: Number(row.lwopDays), dayValue: Number(row.dayValue), amount: Number(row.amount), breakdowns: row.breakdowns.map((item) => ({ date: item.date, source: item.source, attendanceRecordId: item.attendanceRecordId ?? undefined, leaveAllocationId: item.leaveAllocationId ?? undefined, lateMinutes: item.lateMinutes, undertimeMinutes: item.undertimeMinutes, absenceDayValue: Number(item.absenceDayValue), lwopDayValue: Number(item.lwopDayValue), dayValue: Number(item.dayValue), amount: Number(item.amount), description: item.description ?? "" })) })) }))} /></section>;
 }

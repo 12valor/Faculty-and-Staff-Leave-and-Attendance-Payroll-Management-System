@@ -11,14 +11,14 @@ export async function saveEmployeeAction(values: EmployeeValues) {
   const admin = await requireCurrentAdmin();
   const parsed = employeeSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid employee data." };
-  const { id, monthlySalary, middleName, suffix, remarks, ...rest } = parsed.data;
+  const { id, monthlySalary, middleName, suffix, remarks, serviceEndDate, ...rest } = parsed.data;
   try {
     if (id) {
       const before = await getPrisma().employee.findUniqueOrThrow({ where: { id } });
-      const employee = await getPrisma().employee.update({ where: { id }, data: { ...rest, monthlySalary, middleName: middleName || null, suffix: suffix || null, remarks: remarks || null } });
+      const employee = await getPrisma().employee.update({ where: { id }, data: { ...rest, monthlySalary, middleName: middleName || null, suffix: suffix || null, serviceEndDate: serviceEndDate || null, remarks: remarks || null } });
       await createAuditLog({ adminId: admin.id, action: "EMPLOYEE_UPDATED", entityType: "EMPLOYEE", entityId: id, summary: `Employee ${employee.employeeNumber} was updated.`, metadata: { before, after: employee } });
     } else {
-      const employee = await getPrisma().employee.create({ data: { ...rest, monthlySalary, middleName: middleName || null, suffix: suffix || null, remarks: remarks || null, leaveBalance: { create: {} } } });
+      const employee = await getPrisma().employee.create({ data: { ...rest, monthlySalary, middleName: middleName || null, suffix: suffix || null, serviceEndDate: serviceEndDate || null, remarks: remarks || null, leaveBalance: { create: {} } } });
       await createAuditLog({ adminId: admin.id, action: "EMPLOYEE_CREATED", entityType: "EMPLOYEE", entityId: employee.id, summary: `Employee ${employee.employeeNumber} was created.` });
     }
     revalidatePath("/employees");

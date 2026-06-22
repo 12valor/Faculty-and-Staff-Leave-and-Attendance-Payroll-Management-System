@@ -10,11 +10,11 @@ function dayOfWeek(date: string) { return dayNames[new Date(`${date}T00:00:00Z`)
 
 export async function calculateAttendance(input: { employeeId: string; date: string; timeIn?: string | null; timeOut?: string | null; statusOverride?: AttendanceStatus | ""; overrideReason?: string | null }) {
   const prisma = getPrisma();
-  const [employee, rules, conversions, approvedLeave] = await Promise.all([
+  const [employee, rules, conversions, leaveAllocation] = await Promise.all([
     prisma.employee.findUniqueOrThrow({ where: { id: input.employeeId } }),
     getPayrollRules(),
     prisma.cscTimeConversion.findMany(),
-    prisma.leaveRecord.findFirst({ where: { employeeId: input.employeeId, status: "APPROVED", startDate: { lte: input.date }, endDate: { gte: input.date } } }),
+    prisma.leaveAllocation.findFirst({ where: { employeeId: input.employeeId, date: input.date, leaveRecord: { status: "APPROVED" } }, include: { leaveRecord: true } }),
   ]);
   const day = dayOfWeek(input.date);
   let schedule: { expectedTimeIn: string; expectedTimeOut: string } | null = null;
@@ -29,8 +29,9 @@ export async function calculateAttendance(input: { employeeId: string; date: str
   const lateMinutes = schedule && timeIn ? getLateMinutes(schedule.expectedTimeIn, timeIn, rules.lateGraceMinutes) : 0;
   const undertimeMinutes = schedule && timeOut ? getUndertimeMinutes(schedule.expectedTimeOut, timeOut) : 0;
   const overtimeMinutes = schedule && timeOut ? getOvertimeMinutes(schedule.expectedTimeOut, timeOut) : 0;
-  const computedStatus = computeAttendanceStatus({ timeIn, timeOut, schedule, graceMinutes: rules.lateGraceMinutes, approvedLeave: approvedLeave ? { isPaid: approvedLeave.isPaid } : null });
+  const approvedLeave = leaveAllocation ? { isPaid: Number(leaveAllocation.unpaidDayValue) === 0, unpaidDayValue: Number(leaveAllocation.unpaidDayValue) } : null;
+  const computedStatus = computeAttendanceStatus({ timeIn, timeOut, schedule, graceMinutes: rules.lateGraceMinutes, approvedLeave });
   const status = input.statusOverride || computedStatus;
-  const deduction = computeAttendanceDeduction({ monthlySalary: Number(employee.monthlySalary), workingDaysPerMonth: rules.workingDaysPerMonth, status, lateMinutes, undertimeMinutes, approvedLeave: approvedLeave ? { isPaid: approvedLeave.isPaid } : null, conversionTable: conversions.map((row) => ({ unit: row.unit, value: row.value, equivalentDay: Number(row.equivalentDay) })) });
-  return { employee, schedule, approvedLeave, computedStatus, status, isStatusOverridden: Boolean(input.statusOverride), lateMinutes, undertimeMinutes, overtimeMinutes, ...deduction };
+  const deduction = computeAttendanceDeduction({ monthlySalary: Number(employee.monthlySalary), workingDaysPerMonth: rules.workingDaysPerMonth, status, lateMinutes, undertimeMinutes, approvedLeave, conversionTable: conversions.map((row) => ({ unit: row.unit, value: row.value, equivalentDay: Number(row.equivalentDay) })) });
+  return { employee, schedule, approvedLeave: leaveAllocation?.leaveRecord ?? null, computedStatus, status, isStatusOverridden: Boolean(input.statusOverride), lateMinutes, undertimeMinutes, overtimeMinutes, ...deduction };
 }

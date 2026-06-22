@@ -46,6 +46,8 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Se
     positionId: employee.positionId,
     positionName: employee.position.name,
     monthlySalary: Number(employee.monthlySalary),
+    serviceStartDate: employee.serviceStartDate,
+    serviceEndDate: employee.serviceEndDate ?? "",
     employmentStatus: employee.employmentStatus,
     remarks: employee.remarks ?? "",
   }));

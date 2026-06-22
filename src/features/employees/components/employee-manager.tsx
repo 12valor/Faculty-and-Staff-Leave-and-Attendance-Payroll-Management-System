@@ -23,7 +23,7 @@ export type EmployeeRow = EmployeeValues & { id: string; departmentName: string;
 
 type Mode = "create" | "edit" | "view";
 
-const emptyValues: EmployeeValues = { employeeNumber: "", firstName: "", middleName: "", lastName: "", suffix: "", employeeType: "STAFF", departmentId: "", positionId: "", monthlySalary: 0, employmentStatus: "ACTIVE", remarks: "" };
+const emptyValues: EmployeeValues = { employeeNumber: "", firstName: "", middleName: "", lastName: "", suffix: "", employeeType: "STAFF", departmentId: "", positionId: "", monthlySalary: 0, serviceStartDate: new Date().toISOString().slice(0, 10), serviceEndDate: "", employmentStatus: "ACTIVE", remarks: "" };
 
 export function EmployeeManager({ employees, departments, positions }: { employees: EmployeeRow[]; departments: Reference[]; positions: Reference[] }) {
   const [open, setOpen] = useState(false);
@@ -88,6 +88,8 @@ export function EmployeeManager({ employees, departments, positions }: { employe
                 <EmployeeField label="Department"><NativeSelect className="w-full" {...form.register("departmentId")}>{departments.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}</NativeSelect></EmployeeField>
                 <EmployeeField label="Position"><NativeSelect className="w-full" {...form.register("positionId")}>{positions.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}</NativeSelect></EmployeeField>
                 <EmployeeField label="Monthly salary"><Input type="number" min="0" step="0.01" {...form.register("monthlySalary", { valueAsNumber: true })} /></EmployeeField>
+                <EmployeeField label="Service start" error={form.formState.errors.serviceStartDate?.message}><Input type="date" {...form.register("serviceStartDate")} /></EmployeeField>
+                <EmployeeField label="Service end" error={form.formState.errors.serviceEndDate?.message}><Input type="date" {...form.register("serviceEndDate")} /></EmployeeField>
                 <EmployeeField label="Employment status"><NativeSelect className="w-full" {...form.register("employmentStatus")}><NativeSelectOption value="ACTIVE">ACTIVE</NativeSelectOption><NativeSelectOption value="INACTIVE">INACTIVE</NativeSelectOption><NativeSelectOption value="ARCHIVED">ARCHIVED</NativeSelectOption></NativeSelect></EmployeeField>
                 <Field className="md:col-span-2"><FieldLabel>Remarks</FieldLabel><Textarea {...form.register("remarks")} /></Field>
               </FieldGroup>
@@ -101,4 +103,4 @@ export function EmployeeManager({ employees, departments, positions }: { employe
 }
 
 function EmployeeField({ label, error, children }: { label: string; error?: string; children: React.ReactNode }) { return <Field data-invalid={Boolean(error)}><FieldLabel>{label}</FieldLabel>{children}<FieldError>{error}</FieldError></Field>; }
-function EmployeeDetails({ employee }: { employee: EmployeeRow }) { return <div className="grid gap-4 rounded-xl bg-muted/50 p-4 md:grid-cols-2">{[["Employee number", employee.employeeNumber],["Full name", employee.fullName],["Type", employee.employeeType.replaceAll("_", " ")],["Department", employee.departmentName],["Position", employee.positionName],["Monthly salary", `₱${Number(employee.monthlySalary).toLocaleString(undefined, { minimumFractionDigits: 2 })}`],["Status", employee.employmentStatus],["Remarks", employee.remarks || "—"]].map(([label,value]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-medium">{value}</p></div>)}</div>; }
+function EmployeeDetails({ employee }: { employee: EmployeeRow }) { return <div className="grid gap-4 rounded-xl bg-muted/50 p-4 md:grid-cols-2">{[["Employee number", employee.employeeNumber],["Full name", employee.fullName],["Type", employee.employeeType.replaceAll("_", " ")],["Department", employee.departmentName],["Position", employee.positionName],["Monthly salary", `₱${Number(employee.monthlySalary).toLocaleString(undefined, { minimumFractionDigits: 2 })}`],["Service dates", `${employee.serviceStartDate}${employee.serviceEndDate ? ` to ${employee.serviceEndDate}` : " onward"}`],["Status", employee.employmentStatus],["Remarks", employee.remarks || "—"]].map(([label,value]) => <div key={label}><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 font-medium">{value}</p></div>)}</div>; }

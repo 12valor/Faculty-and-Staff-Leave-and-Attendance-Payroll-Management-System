@@ -41,7 +41,7 @@ export function computeAttendanceStatus(input: {
   timeOut?: string | null;
   schedule?: DailySchedule | null;
   graceMinutes: number;
-  approvedLeave?: { isPaid: boolean } | null;
+  approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
 }): AttendanceStatus {
   if (input.approvedLeave) return "ON_LEAVE";
   if (!input.timeIn || !input.timeOut) return "ABSENT";
@@ -57,11 +57,12 @@ export function computeAttendanceDeduction(input: {
   status: AttendanceStatus;
   lateMinutes: number;
   undertimeMinutes: number;
-  approvedLeave?: { isPaid: boolean } | null;
+  approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
   conversionTable: TimeConversionRow[];
 }) {
   let deductionDayValue = 0;
-  if (input.approvedLeave?.isPaid) deductionDayValue = 0;
+  if (input.approvedLeave && (input.approvedLeave.unpaidDayValue ?? 0) > 0) deductionDayValue = Math.min(1, input.approvedLeave.unpaidDayValue ?? 0);
+  else if (input.approvedLeave?.isPaid) deductionDayValue = 0;
   else if (input.status === "ABSENT" || (input.status === "ON_LEAVE" && input.approvedLeave && !input.approvedLeave.isPaid)) deductionDayValue = 1;
   else deductionDayValue = convertMinutesToDayValue(input.lateMinutes + input.undertimeMinutes, input.conversionTable);
 

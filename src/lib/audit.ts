@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getPrisma } from "@/lib/prisma";
+import type { PrismaClient } from "@/generated/prisma/client";
 
 type AuditInput = {
   adminId?: string | null;
@@ -11,8 +12,10 @@ type AuditInput = {
   metadata?: unknown;
 };
 
-export async function createAuditLog(input: AuditInput) {
-  return getPrisma().auditLog.create({
+type AuditClient = Pick<PrismaClient, "auditLog">;
+
+export async function createAuditLog(input: AuditInput, client?: AuditClient) {
+  return (client ?? getPrisma()).auditLog.create({
     data: {
       adminId: input.adminId ?? null,
       action: input.action,
