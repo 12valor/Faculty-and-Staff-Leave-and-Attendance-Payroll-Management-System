@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { ShieldCheck } from "lucide-react";
+import VerifiedUserRoundedIcon from "@mui/icons-material/VerifiedUserRounded";
 import { redirect } from "next/navigation";
 
 import { BrandMark } from "@/components/brand-mark";
@@ -26,7 +26,7 @@ export default async function LoginPage() {
         <BrandMark className="relative [&_p]:text-primary-foreground" />
         <div className="relative max-w-xl">
           <div className="mb-8 flex size-14 items-center justify-center rounded-2xl bg-primary-foreground/15">
-            <ShieldCheck aria-hidden="true" />
+            <VerifiedUserRoundedIcon aria-hidden="true" />
           </div>
           <h1 className="text-4xl font-semibold leading-tight tracking-tight">
             Faculty and staff records, managed locally.

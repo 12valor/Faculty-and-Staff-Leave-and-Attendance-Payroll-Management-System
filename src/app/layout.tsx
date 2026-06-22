@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import { GeistMono } from "geist/font/mono";
-import { GeistSans } from "geist/font/sans";
+import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
+import "@fontsource/poppins/400.css";
+import "@fontsource/poppins/500.css";
+import "@fontsource/poppins/600.css";
+import "@fontsource/poppins/700.css";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -19,8 +22,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`}>
-      <body>{children}<Toaster richColors position="top-right" /></body>
+    <html lang="en">
+      <body><AppRouterCacheProvider options={{ enableCssLayer: true }}>{children}<Toaster richColors position="top-right" /></AppRouterCacheProvider></body>
     </html>
   );
 }

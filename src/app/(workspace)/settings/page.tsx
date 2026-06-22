@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpenCheck } from "lucide-react";
+import BookOpenCheck from "@mui/icons-material/MenuBookRounded";
 
 import { PageTitle } from "@/components/page-title";
 import { Badge } from "@/components/ui/badge";

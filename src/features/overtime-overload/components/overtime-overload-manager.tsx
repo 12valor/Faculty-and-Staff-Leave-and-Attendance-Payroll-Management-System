@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check, X } from "lucide-react";
+import Check from "@mui/icons-material/CheckCircleRounded";
+import X from "@mui/icons-material/CancelRounded";
 import { toast } from "sonner";
 
 import { Badge } from "@/components/ui/badge";

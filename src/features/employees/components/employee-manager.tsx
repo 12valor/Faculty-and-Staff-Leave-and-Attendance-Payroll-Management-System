@@ -3,7 +3,10 @@
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { flexRender, getCoreRowModel, useReactTable, type ColumnDef } from "@tanstack/react-table";
-import { Archive, Eye, Pencil, Plus } from "lucide-react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
+import ArchiveRoundedIcon from "@mui/icons-material/ArchiveRounded";
+import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -57,7 +60,7 @@ export function EmployeeManager({ employees, departments, positions }: { employe
     { accessorKey: "employeeType", header: "Type", cell: ({ row }) => <Badge variant="secondary">{row.original.employeeType.replaceAll("_", " ")}</Badge> },
     { accessorKey: "monthlySalary", header: "Monthly salary", cell: ({ row }) => <span className="font-mono">₱{Number(row.original.monthlySalary).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span> },
     { accessorKey: "employmentStatus", header: "Status", cell: ({ row }) => <Badge variant={row.original.employmentStatus === "ACTIVE" ? "secondary" : "outline"}>{row.original.employmentStatus}</Badge> },
-    { id: "actions", header: "Actions", cell: ({ row }) => <div className="flex gap-1"><Button size="icon-sm" variant="ghost" aria-label="View employee" onClick={() => show("view", row.original)}><Eye /></Button><Button size="icon-sm" variant="ghost" aria-label="Edit employee" onClick={() => show("edit", row.original)}><Pencil /></Button><Button size="icon-sm" variant="ghost" aria-label={row.original.employmentStatus === "ARCHIVED" ? "Reactivate employee" : "Archive employee"} onClick={() => changeStatus(row.original)}><Archive /></Button></div> },
+    { id: "actions", header: "Actions", cell: ({ row }) => <div className="flex gap-1"><Button size="icon-sm" variant="ghost" aria-label="View employee" onClick={() => show("view", row.original)}><VisibilityRoundedIcon /></Button><Button size="icon-sm" variant="ghost" aria-label="Edit employee" onClick={() => show("edit", row.original)}><EditRoundedIcon /></Button><Button size="icon-sm" variant="ghost" aria-label={row.original.employmentStatus === "ARCHIVED" ? "Reactivate employee" : "Archive employee"} onClick={() => changeStatus(row.original)}><ArchiveRoundedIcon /></Button></div> },
   ];
 
   // TanStack Table intentionally returns a mutable table instance.
@@ -66,9 +69,9 @@ export function EmployeeManager({ employees, departments, positions }: { employe
 
   return (
     <>
-      <div className="flex justify-end"><Button onClick={() => show("create")} disabled={!departments.length || !positions.length}><Plus data-icon="inline-start" />Add employee</Button></div>
+      <div className="flex justify-end"><Button onClick={() => show("create")} disabled={!departments.length || !positions.length}><AddRoundedIcon data-icon="inline-start" />Add employee</Button></div>
       {!departments.length || !positions.length ? <p className="rounded-lg bg-secondary p-3 text-sm text-secondary-foreground">Add at least one active department and position in Settings before creating employees.</p> : null}
-      <div className="overflow-x-auto rounded-xl border bg-card">
+      <div className="data-table-shell">
         <Table><TableHeader>{table.getHeaderGroups().map((group) => <TableRow key={group.id}>{group.headers.map((header) => <TableHead key={header.id}>{flexRender(header.column.columnDef.header, header.getContext())}</TableHead>)}</TableRow>)}</TableHeader><TableBody>{table.getRowModel().rows.length ? table.getRowModel().rows.map((row) => <TableRow key={row.id}>{row.getVisibleCells().map((cell) => <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>)}</TableRow>) : <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No employees match the current filters.</TableCell></TableRow>}</TableBody></Table>
       </div>
 

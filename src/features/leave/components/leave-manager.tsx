@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, Plus, X } from "lucide-react";
+import Check from "@mui/icons-material/CheckCircleRounded";
+import Plus from "@mui/icons-material/AddRounded";
+import X from "@mui/icons-material/CancelRounded";
 import { useForm, useWatch } from "react-hook-form";
 import { toast } from "sonner";
 

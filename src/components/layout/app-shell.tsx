@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, ChevronDown, Menu } from "lucide-react";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import MenuRoundedIcon from "@mui/icons-material/MenuRounded";
+import NotificationsNoneRoundedIcon from "@mui/icons-material/NotificationsNoneRounded";
 
 import { BrandMark } from "@/components/brand-mark";
 import { logoutAction } from "@/features/auth/actions";
@@ -37,7 +39,7 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label="Primary navigation" className="flex flex-col gap-1.5">
+    <nav aria-label="Primary navigation" className="flex flex-col gap-1">
       {navigationItems.map((item) => {
         const isActive = pathname === item.href;
         const Icon = item.icon;
@@ -48,14 +50,14 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
             href={item.href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "flex min-h-10 items-center gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+              "relative flex min-h-11 items-center gap-3 rounded-md px-3 text-sm font-medium transition-colors before:absolute before:inset-y-2 before:left-0 before:w-0.5 before:rounded-full before:bg-transparent",
               isActive
-                ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                ? "bg-sidebar-accent font-semibold text-primary before:bg-primary"
+                : "text-muted-foreground hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
               mobile ? "text-base" : null,
             )}
           >
-            <Icon aria-hidden="true" />
+            <Icon aria-hidden="true" fontSize="small" />
             <span>{item.title}</span>
           </Link>
         );
@@ -74,19 +76,19 @@ export function AppShell({ children, admin }: AppShellProps) {
     <div className="min-h-screen bg-background">
       <aside
         data-print-hidden="true"
-        className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r bg-sidebar lg:flex"
+        className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r bg-sidebar shadow-[2px_0_12px_rgb(15_23_42/0.025)] lg:flex"
       >
         <div className="flex h-20 items-center border-b px-5">
           <BrandMark />
         </div>
         <div className="flex-1 overflow-y-auto px-3 py-5">
-          <p className="mb-3 px-3 text-xs font-semibold tracking-[0.12em] text-muted-foreground uppercase">
+          <p className="mb-3 px-3 text-[0.68rem] font-semibold tracking-[0.14em] text-muted-foreground uppercase">
             Workspace
           </p>
           <Navigation />
         </div>
         <div className="border-t p-4">
-          <div className="rounded-xl bg-secondary p-3">
+          <div className="rounded-lg border border-primary/10 bg-secondary/70 p-3">
             <p className="text-xs font-semibold text-secondary-foreground">
               Local database
             </p>
@@ -114,7 +116,7 @@ export function AppShell({ children, admin }: AppShellProps) {
                   />
                 }
               >
-                <Menu />
+                <MenuRoundedIcon />
               </SheetTrigger>
               <SheetContent side="left" className="w-80">
                 <SheetHeader className="border-b">
@@ -131,10 +133,10 @@ export function AppShell({ children, admin }: AppShellProps) {
               </SheetContent>
             </Sheet>
             <div className="min-w-0">
-              <p className="truncate text-xs font-medium text-muted-foreground">
+              <p className="truncate text-[0.7rem] font-medium tracking-wide text-muted-foreground uppercase">
                 Faculty and Staff Management
               </p>
-              <h1 className="truncate text-lg font-semibold md:text-xl">
+              <h1 className="truncate text-lg font-bold md:text-xl">
                 {currentPage}
               </h1>
             </div>
@@ -142,7 +144,7 @@ export function AppShell({ children, admin }: AppShellProps) {
 
           <div className="flex items-center gap-2">
             <Button variant="ghost" size="icon" aria-label="Notifications">
-              <Bell />
+              <NotificationsNoneRoundedIcon />
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger
@@ -163,7 +165,7 @@ export function AppShell({ children, admin }: AppShellProps) {
                     Local account
                   </span>
                 </span>
-                <ChevronDown aria-hidden="true" />
+                <ExpandMoreRoundedIcon aria-hidden="true" fontSize="small" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuGroup>
@@ -179,7 +181,7 @@ export function AppShell({ children, admin }: AppShellProps) {
           </div>
         </header>
 
-        <main className="mx-auto w-full max-w-[1600px] p-4 md:p-8">
+        <main className="mx-auto w-full max-w-[1600px] p-4 md:p-8 lg:p-9">
           {children}
         </main>
       </div>

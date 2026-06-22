@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Eye, LockKeyhole, Plus, RefreshCw } from "lucide-react";
+import Eye from "@mui/icons-material/VisibilityRounded";
+import LockKeyhole from "@mui/icons-material/LockRounded";
+import Plus from "@mui/icons-material/AddRounded";
+import RefreshCw from "@mui/icons-material/RefreshRounded";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 

@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Archive, Pencil, Plus } from "lucide-react";
+import Archive from "@mui/icons-material/ArchiveRounded";
+import Pencil from "@mui/icons-material/EditRounded";
+import Plus from "@mui/icons-material/AddRounded";
 import { useForm, type UseFormRegisterReturn } from "react-hook-form";
 import { toast } from "sonner";
 
