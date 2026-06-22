@@ -1,8 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
@@ -10,4 +5,379 @@ generator client {
 
 datasource db {
   provider = "sqlite"
+}
+
+enum EmployeeType {
+  FACULTY
+  STAFF
+  FACULTY_WITH_STAFF_WORK
+}
+
+enum AttendanceStatus {
+  PRESENT
+  LATE
+  ABSENT
+  ON_LEAVE
+  UNDERTIME
+}
+
+enum AttendanceEntryMethod {
+  ADMIN_MANUAL
+  BULK_ENCODING
+  CSV_IMPORT
+}
+
+enum LeaveType {
+  VACATION
+  SICK
+  LEAVE_WITHOUT_PAY
+  OTHER
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PayrollStatus {
+  DRAFT
+  GENERATED
+  LOCKED
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+enum CscTimeUnit {
+  HOUR
+  MINUTE
+}
+
+enum LeaveTransactionType {
+  CREDIT
+  DEBIT
+  ADJUSTMENT
+}
+
+model AdminUser {
+  id           String     @id @default(cuid())
+  username     String     @unique
+  passwordHash String
+  isActive     Boolean    @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  auditLogs    AuditLog[]
+}
+
+model Department {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  employees   Employee[]
+}
+
+model Position {
+  id          String     @id @default(cuid())
+  name        String     @unique
+  description String?
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  employees   Employee[]
+}
+
+model Employee {
+  id                String             @id @default(cuid())
+  employeeNumber    String             @unique
+  firstName         String
+  middleName        String?
+  lastName          String
+  suffix            String?
+  employeeType      EmployeeType
+  departmentId      String
+  positionId        String
+  monthlySalary     Decimal            @default(0)
+  employmentStatus  EmploymentStatus   @default(ACTIVE)
+  remarks           String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  department        Department         @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  position          Position           @relation(fields: [positionId], references: [id], onDelete: Restrict)
+  workSchedules     WorkSchedule[]
+  facultySchedules  FacultySchedule[]
+  attendanceRecords AttendanceRecord[]
+  leaveRecords      LeaveRecord[]
+  leaveBalance      LeaveBalance?
+  leaveTransactions LeaveTransaction[]
+  payrollDeductions PayrollDeduction[]
+  overtimeRecords   OvertimeRecord[]
+  overloadRecords   OverloadRecord[]
+
+  @@index([lastName, firstName])
+  @@index([employeeType])
+  @@index([departmentId])
+  @@index([positionId])
+  @@index([employmentStatus])
+}
+
+model WorkSchedule {
+  id              String    @id @default(cuid())
+  employeeId      String
+  dayOfWeek       DayOfWeek
+  expectedTimeIn  String
+  expectedTimeOut String
+  breakMinutes    Int       @default(0)
+  requiredHours   Decimal
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@unique([employeeId, dayOfWeek])
+  @@index([dayOfWeek, isActive])
+}
+
+model FacultySchedule {
+  id                 String    @id @default(cuid())
+  employeeId         String
+  subjectOrClass     String
+  dayOfWeek          DayOfWeek
+  startTime          String
+  endTime            String
+  totalTeachingHours Decimal
+  roomOrSection      String?
+  remarks            String?
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, dayOfWeek, isActive])
+  @@index([dayOfWeek, isActive])
+}
+
+model AttendanceRecord {
+  id                 String                @id @default(cuid())
+  employeeId         String
+  date               String
+  timeIn             String?
+  timeOut            String?
+  entryMethod        AttendanceEntryMethod
+  computedStatus     AttendanceStatus
+  status             AttendanceStatus
+  isStatusOverridden Boolean               @default(false)
+  overrideReason     String?
+  lateMinutes        Int                   @default(0)
+  undertimeMinutes   Int                   @default(0)
+  overtimeMinutes    Int                   @default(0)
+  deductionDayValue  Decimal               @default(0)
+  deductionAmount    Decimal               @default(0)
+  remarks            String?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  employee           Employee              @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  payrollDeduction   PayrollDeduction?
+
+  @@unique([employeeId, date])
+  @@index([date])
+  @@index([status])
+  @@index([entryMethod])
+}
+
+model LeaveRecord {
+  id           String             @id @default(cuid())
+  employeeId   String
+  leaveType    LeaveType
+  status       LeaveStatus        @default(PENDING)
+  startDate    String
+  endDate      String
+  numberOfDays Decimal
+  isPaid       Boolean            @default(true)
+  reason       String?
+  remarks      String?
+  approvedAt   DateTime?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  employee     Employee           @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  transactions LeaveTransaction[]
+
+  @@index([employeeId, startDate, endDate])
+  @@index([status])
+}
+
+model LeaveBalance {
+  id              String   @id @default(cuid())
+  employeeId      String   @unique
+  vacationBalance Decimal  @default(0)
+  sickBalance     Decimal  @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model LeaveTransaction {
+  id              String               @id @default(cuid())
+  employeeId      String
+  leaveRecordId   String?
+  transactionType LeaveTransactionType
+  leaveType       LeaveType
+  amount          Decimal
+  balanceAfter    Decimal
+  description     String?
+  createdAt       DateTime             @default(now())
+  employee        Employee             @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  leaveRecord     LeaveRecord?         @relation(fields: [leaveRecordId], references: [id], onDelete: SetNull)
+
+  @@index([employeeId, createdAt])
+}
+
+model PayrollPeriod {
+  id          String             @id @default(cuid())
+  name        String             @unique
+  startDate   String
+  endDate     String
+  status      PayrollStatus      @default(DRAFT)
+  generatedAt DateTime?
+  lockedAt    DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deductions  PayrollDeduction[]
+
+  @@index([startDate, endDate])
+}
+
+model PayrollDeduction {
+  id                 String            @id @default(cuid())
+  payrollPeriodId    String
+  employeeId         String
+  attendanceRecordId String?           @unique
+  deductionType      String
+  dayValue           Decimal           @default(0)
+  amount             Decimal           @default(0)
+  remarks            String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  payrollPeriod      PayrollPeriod     @relation(fields: [payrollPeriodId], references: [id], onDelete: Cascade)
+  employee           Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  attendanceRecord   AttendanceRecord? @relation(fields: [attendanceRecordId], references: [id], onDelete: SetNull)
+
+  @@unique([payrollPeriodId, employeeId, deductionType, attendanceRecordId])
+  @@index([employeeId])
+}
+
+model OvertimeRecord {
+  id         String   @id @default(cuid())
+  employeeId String
+  date       String
+  minutes    Int
+  hours      Decimal
+  amount     Decimal  @default(0)
+  remarks    String?
+  isApproved Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([employeeId, date])
+}
+
+model OverloadRecord {
+  id             String   @id @default(cuid())
+  employeeId     String
+  periodLabel    String
+  subjectOrClass String
+  teachingHours  Decimal
+  amount         Decimal  @default(0)
+  remarks        String?
+  isApproved     Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  employee       Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@index([employeeId, periodLabel])
+}
+
+model CscTimeConversion {
+  id            String      @id @default(cuid())
+  unit          CscTimeUnit
+  value         Int
+  equivalentDay Decimal
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([unit, value])
+}
+
+model CscMonthlyLeaveCredit {
+  id                  String   @id @default(cuid())
+  numberOfMonths      Int      @unique
+  vacationLeaveEarned Decimal
+  sickLeaveEarned     Decimal
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model CscDailyLeaveCredit {
+  id                  String   @id @default(cuid())
+  numberOfDays        Int      @unique
+  vacationLeaveEarned Decimal
+  sickLeaveEarned     Decimal
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model CscLwopLeaveCredit {
+  id                 String   @id @default(cuid())
+  daysPresent        Decimal
+  daysOnLwop         Decimal
+  leaveCreditsEarned Decimal
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@unique([daysPresent, daysOnLwop])
+}
+
+model AuditLog {
+  id         String     @id @default(cuid())
+  adminId    String?
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  metadata   String?
+  createdAt  DateTime   @default(now())
+  admin      AdminUser? @relation(fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([entityType, entityId])
+}
+
+model SystemSetting {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
+  valueType   String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

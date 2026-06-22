@@ -1,5 +1,6 @@
-﻿import type { Metadata } from "next";
+import type { Metadata } from "next";
 import { ShieldCheck } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { BrandMark } from "@/components/brand-mark";
 import {
@@ -10,12 +11,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { LoginForm } from "@/features/auth/components/login-form";
+import { getCurrentAdmin } from "@/lib/auth/current-admin";
 
 export const metadata: Metadata = {
   title: "Login",
 };
 
-export default function LoginPage() {
+export default async function LoginPage() {
+  if (await getCurrentAdmin()) redirect("/dashboard");
   return (
     <main className="grid min-h-screen lg:grid-cols-[minmax(0,1.05fr)_minmax(420px,0.95fr)]">
       <section className="relative hidden overflow-hidden bg-primary p-12 text-primary-foreground lg:flex lg:flex-col lg:justify-between">

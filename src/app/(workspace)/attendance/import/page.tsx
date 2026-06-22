@@ -1,0 +1,3 @@
+import { PageTitle } from "@/components/page-title";
+import { AttendanceCsvImporter } from "@/features/attendance/components/attendance-csv-importer";
+export default function AttendanceImportPage() { return <section className="flex flex-col gap-6"><PageTitle title="CSV Attendance Import" description="Validate and import attendance records in one all-or-nothing transaction." /><AttendanceCsvImporter /></section>; }

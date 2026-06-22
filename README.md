@@ -1,26 +1,33 @@
-﻿# Faculty and Staff Management System
+# Faculty and Staff Management System
 
-A local-first web application scaffold for faculty and staff leave, attendance,
-schedules, payroll deductions, overtime, overload, and institutional reports.
+A local-first, single-Admin system for faculty and staff records, schedules, attendance encoding, CSC computations, and payroll deductions.
 
 ## Local setup
 
 ```powershell
 npm install
 Copy-Item .env.example .env
-npm run prisma:generate
+# Replace SESSION_SECRET in .env with at least 32 random characters.
+npx prisma migrate dev --name phase_1_2_core
+npx prisma db seed
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Open http://localhost:3000.
 
-## Current scope
+Default Admin credentials:
 
-- Next.js App Router, TypeScript, Tailwind CSS, and shadcn/ui
-- Prisma ORM configured for a local SQLite database
-- Validated login interface without authentication sessions
-- Responsive application shell and prepared module routes
-- Dashboard presentation using Recharts and TanStack Table
-- ExcelJS and browser print utilities prepared for future reports
+- Username: `admin`
+- Password: `admin123`
 
-The root-level CSC CSV files are preserved as future leave-credit references.
+## Included modules
+
+- Signed 8-hour Admin session and protected workspace routes
+- Departments, positions, payroll rules, and view-only CSC tables
+- Employee CRUD with archive/reactivate behavior
+- Staff and faculty schedule management with eligibility and overlap checks
+- Manual, bulk, and CSV attendance encoding
+- CSC day-value and salary deduction calculations
+- Audit logs for authentication and all implemented mutations
+
+The original root-level CSC CSV files remain unchanged. Runtime seed sources are copied under `data/`.

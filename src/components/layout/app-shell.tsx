@@ -1,10 +1,11 @@
-﻿"use client";
+"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, ChevronDown, Menu } from "lucide-react";
 
 import { BrandMark } from "@/components/brand-mark";
+import { logoutAction } from "@/features/auth/actions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ import { cn } from "@/lib/utils";
 
 type AppShellProps = {
   children: React.ReactNode;
+  admin: { id: string; username: string; lastLoginAt: Date | null };
 };
 
 function Navigation({ mobile = false }: { mobile?: boolean }) {
@@ -62,10 +64,10 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
   );
 }
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, admin }: AppShellProps) {
   const pathname = usePathname();
   const currentPage =
-    navigationItems.find((item) => item.href === pathname)?.title ??
+    navigationItems.find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`))?.title ??
     "Faculty & Staff";
 
   return (
@@ -156,7 +158,7 @@ export function AppShell({ children }: AppShellProps) {
                   <AvatarFallback>AD</AvatarFallback>
                 </Avatar>
                 <span className="hidden text-left md:block">
-                  <span className="block text-sm font-medium">Administrator</span>
+                  <span className="block text-sm font-medium">{admin.username}</span>
                   <span className="block text-xs text-muted-foreground">
                     Local account
                   </span>
@@ -164,14 +166,13 @@ export function AppShell({ children }: AppShellProps) {
                 <ChevronDown aria-hidden="true" />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>My account</DropdownMenuLabel>
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>Profile</DropdownMenuItem>
-                  <DropdownMenuItem>Local preferences</DropdownMenuItem>
+                  <DropdownMenuLabel>My account</DropdownMenuLabel>
+                  <DropdownMenuItem>Single administrator</DropdownMenuItem>
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem>Sign out</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => logoutAction()}>Sign out</DropdownMenuItem>
                 </DropdownMenuGroup>
               </DropdownMenuContent>
             </DropdownMenu>
