@@ -91,7 +91,7 @@ export async function saveFacultyScheduleAction(values: FacultyScheduleValues) {
       await tx.facultySchedule.createMany({ data: data.workingDays.map((dayOfWeek) => ({
         employeeId: data.employeeId,
         scheduleGroupId,
-        subjectOrClass: data.subjectOrClass,
+        subjectOrClass: data.subjectOrClass || "Whole Day",
         dayOfWeek,
         startTime: data.startTime,
         endTime: data.endTime,
@@ -101,7 +101,7 @@ export async function saveFacultyScheduleAction(values: FacultyScheduleValues) {
         effectiveFrom: data.effectiveFrom,
         effectiveTo,
       })) });
-      await createAuditLog({ adminId: admin.id, action: "FACULTY_SCHEDULE_VERSION_SAVED", entityType: "FACULTY_SCHEDULE", entityId: scheduleGroupId, summary: `Teaching schedule for ${employee.employeeNumber} was saved from ${data.effectiveFrom}.`, metadata: { subjectOrClass: data.subjectOrClass, workingDays: data.workingDays, effectiveFrom: data.effectiveFrom } }, tx);
+      await createAuditLog({ adminId: admin.id, action: "FACULTY_SCHEDULE_VERSION_SAVED", entityType: "FACULTY_SCHEDULE", entityId: scheduleGroupId, summary: `Teaching schedule for ${employee.employeeNumber} was saved from ${data.effectiveFrom}.`, metadata: { subjectOrClass: data.subjectOrClass || "Whole Day", workingDays: data.workingDays, effectiveFrom: data.effectiveFrom } }, tx);
       return scheduleGroupId;
     });
     revalidateSchedulePaths();

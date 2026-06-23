@@ -21,7 +21,7 @@ export const facultyScheduleSchema = z.object({
   id: z.string().optional(),
   scheduleGroupId: z.string().optional(),
   employeeId: z.string().min(1),
-  subjectOrClass: z.string().trim().min(1).max(150),
+  subjectOrClass: z.string().trim().max(150).optional(),
   workingDays,
   effectiveFrom,
   startTime: time,
