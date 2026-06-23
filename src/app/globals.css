@@ -140,5 +140,6 @@
     break-inside: avoid;
     page-break-inside: avoid;
     margin: 0 !important;
+    zoom: 0.85;
   }
 }
