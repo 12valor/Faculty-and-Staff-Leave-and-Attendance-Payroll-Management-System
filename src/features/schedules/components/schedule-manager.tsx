@@ -5,6 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Archive from "@mui/icons-material/ArchiveRounded";
 import Pencil from "@mui/icons-material/EditRounded";
 import Plus from "@mui/icons-material/AddRounded";
+import { useRouter } from "next/navigation";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { toast } from "sonner";
 
@@ -27,8 +28,10 @@ const dayLabels: Record<DayOfWeek, string> = { MONDAY: "Monday", TUESDAY: "Tuesd
 type EmployeeOption = { id: string; label: string; employeeType: "FACULTY" | "STAFF" | "FACULTY_WITH_STAFF_WORK" };
 export type WorkRow = WorkScheduleValues & { scheduleGroupId: string; employeeLabel: string; effectiveTo: string | null; isActive: boolean };
 export type FacultyRow = FacultyScheduleValues & { scheduleGroupId: string; employeeLabel: string; totalTeachingHours: number; effectiveTo: string | null; isActive: boolean };
+type ScheduleActionResult = { ok: boolean; error?: string };
 
 export function ScheduleManager({ employees, workSchedules, facultySchedules, summaries }: { employees: EmployeeOption[]; workSchedules: WorkRow[]; facultySchedules: FacultyRow[]; summaries: Array<{ employeeLabel: string; workDays: number; teachingHours: number }> }) {
+  const router = useRouter();
   const today = todayInTimeZone();
   const [workOpen, setWorkOpen] = useState(false);
   const [facultyOpen, setFacultyOpen] = useState(false);
@@ -39,9 +42,20 @@ export function ScheduleManager({ employees, workSchedules, facultySchedules, su
 
   function openWork(row?: WorkRow) { workForm.reset(row ? { ...row, effectiveFrom: row.effectiveFrom < today ? today : row.effectiveFrom } : workDefaults(workEmployees[0]?.id ?? "", today)); setWorkOpen(true); }
   function openFaculty(row?: FacultyRow) { facultyForm.reset(row ? { ...row, effectiveFrom: row.effectiveFrom < today ? today : row.effectiveFrom } : facultyDefaults(facultyEmployees[0]?.id ?? "", today)); setFacultyOpen(true); }
-  async function submitWork(values: WorkScheduleValues) { const result = await saveWorkScheduleAction(values); if (!result.ok) return toast.error(result.error); toast.success("Staff schedule saved."); setWorkOpen(false); }
-  async function submitFaculty(values: FacultyScheduleValues) { const result = await saveFacultyScheduleAction(values); if (!result.ok) return toast.error(result.error); toast.success("Teaching schedule saved."); setFacultyOpen(false); }
-  async function archive(kind: "work" | "faculty", groupId: string) { const result = await archiveScheduleAction(kind, groupId); if (!result.ok) return toast.error(result.error); toast.success("Schedule ended without removing its history."); }
+  async function runScheduleAction(action: () => Promise<ScheduleActionResult>, successMessage: string, onSuccess?: () => void) {
+    try {
+      const result = await action();
+      if (!result.ok) return toast.error(result.error ?? "The schedule could not be updated.");
+      onSuccess?.();
+      toast.success(successMessage);
+      router.refresh();
+    } catch {
+      toast.error("The server connection was interrupted. Refresh the page and try again.");
+    }
+  }
+  async function submitWork(values: WorkScheduleValues) { await runScheduleAction(() => saveWorkScheduleAction(values), "Staff schedule saved.", () => setWorkOpen(false)); }
+  async function submitFaculty(values: FacultyScheduleValues) { await runScheduleAction(() => saveFacultyScheduleAction(values), "Teaching schedule saved.", () => setFacultyOpen(false)); }
+  async function archive(kind: "work" | "faculty", groupId: string) { await runScheduleAction(() => archiveScheduleAction(kind, groupId), "Schedule ended without removing its history."); }
 
   return <>
     {summaries.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{summaries.map((summary) => <div key={summary.employeeLabel} className="rounded-xl border bg-card p-4"><p className="font-medium">{summary.employeeLabel}</p><div className="mt-3 flex gap-2"><Badge variant="secondary">{summary.workDays} work days</Badge><Badge variant="outline">{summary.teachingHours.toFixed(2)} weekly hours</Badge></div></div>)}</div> : null}
@@ -59,7 +73,7 @@ export function ScheduleManager({ employees, workSchedules, facultySchedules, su
  
     <Dialog open={workOpen} onOpenChange={setWorkOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Staff work schedule</DialogTitle><DialogDescription>Select all working days that share this schedule. The effective date preserves older versions.</DialogDescription></DialogHeader><form onSubmit={workForm.handleSubmit(submitWork)} className="flex flex-col gap-5"><input type="hidden" {...workForm.register("scheduleGroupId")} /><FieldGroup className="grid gap-4 md:grid-cols-2"><ScheduleField label="Employee"><NativeSelect className="w-full" {...workForm.register("employeeId")}>{workEmployees.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect></ScheduleField><ScheduleField label="Effective from"><Input type="date" {...workForm.register("effectiveFrom")} /></ScheduleField><ScheduleField label="Expected time in"><Input type="time" {...workForm.register("expectedTimeIn")} /></ScheduleField><ScheduleField label="Expected time out"><Input type="time" {...workForm.register("expectedTimeOut")} /></ScheduleField><ScheduleField label="Break minutes"><Input type="number" min="0" {...workForm.register("breakMinutes", { valueAsNumber: true })} /></ScheduleField><ScheduleField label="Required hours"><Input type="number" min="0.25" step="0.25" {...workForm.register("requiredHours", { valueAsNumber: true })} /></ScheduleField></FieldGroup><WorkingDaysField form={workForm} /><FieldError>{firstError(workForm.formState.errors)}</FieldError><DialogFooter><Button type="button" variant="outline" onClick={() => setWorkOpen(false)}>Cancel</Button><Button type="submit" disabled={workForm.formState.isSubmitting}>Save schedule</Button></DialogFooter></form></DialogContent></Dialog>
  
-    <Dialog open={facultyOpen} onOpenChange={setFacultyOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Faculty daily schedule</DialogTitle><DialogDescription>Define the start and end times for the faculty member's working day.</DialogDescription></DialogHeader><form onSubmit={facultyForm.handleSubmit(submitFaculty)} className="flex flex-col gap-5"><input type="hidden" {...facultyForm.register("scheduleGroupId")} /><FieldGroup className="grid gap-4 md:grid-cols-2"><ScheduleField label="Employee"><NativeSelect className="w-full" {...facultyForm.register("employeeId")}>{facultyEmployees.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect></ScheduleField><ScheduleField label="Effective from"><Input type="date" {...facultyForm.register("effectiveFrom")} /></ScheduleField><ScheduleField label="Schedule Label / Description"><Input {...facultyForm.register("subjectOrClass")} placeholder="Whole Day" /></ScheduleField><ScheduleField label="Room or section"><Input {...facultyForm.register("roomOrSection")} /></ScheduleField><ScheduleField label="Start time"><Input type="time" {...facultyForm.register("startTime")} /></ScheduleField><ScheduleField label="End time"><Input type="time" {...facultyForm.register("endTime")} /></ScheduleField><Field className="md:col-span-2"><FieldLabel>Remarks</FieldLabel><Textarea {...facultyForm.register("remarks")} /></Field></FieldGroup><WorkingDaysField form={facultyForm} /><FieldError>{firstError(facultyForm.formState.errors)}</FieldError><DialogFooter><Button type="button" variant="outline" onClick={() => setFacultyOpen(false)}>Cancel</Button><Button type="submit" disabled={facultyForm.formState.isSubmitting}>Save schedule</Button></DialogFooter></form></DialogContent></Dialog>
+    <Dialog open={facultyOpen} onOpenChange={setFacultyOpen}><DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"><DialogHeader><DialogTitle>Faculty daily schedule</DialogTitle><DialogDescription>Define the start and end times for the faculty member&apos;s working day.</DialogDescription></DialogHeader><form onSubmit={facultyForm.handleSubmit(submitFaculty)} className="flex flex-col gap-5"><input type="hidden" {...facultyForm.register("scheduleGroupId")} /><FieldGroup className="grid gap-4 md:grid-cols-2"><ScheduleField label="Employee"><NativeSelect className="w-full" {...facultyForm.register("employeeId")}>{facultyEmployees.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect></ScheduleField><ScheduleField label="Effective from"><Input type="date" {...facultyForm.register("effectiveFrom")} /></ScheduleField><ScheduleField label="Schedule Label / Description"><Input {...facultyForm.register("subjectOrClass")} placeholder="Whole Day" /></ScheduleField><ScheduleField label="Room or section"><Input {...facultyForm.register("roomOrSection")} /></ScheduleField><ScheduleField label="Start time"><Input type="time" {...facultyForm.register("startTime")} /></ScheduleField><ScheduleField label="End time"><Input type="time" {...facultyForm.register("endTime")} /></ScheduleField><Field className="md:col-span-2"><FieldLabel>Remarks</FieldLabel><Textarea {...facultyForm.register("remarks")} /></Field></FieldGroup><WorkingDaysField form={facultyForm} /><FieldError>{firstError(facultyForm.formState.errors)}</FieldError><DialogFooter><Button type="button" variant="outline" onClick={() => setFacultyOpen(false)}>Cancel</Button><Button type="submit" disabled={facultyForm.formState.isSubmitting}>Save schedule</Button></DialogFooter></form></DialogContent></Dialog>
   </>;
 }
  

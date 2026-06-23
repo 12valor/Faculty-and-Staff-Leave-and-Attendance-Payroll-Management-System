@@ -28,10 +28,11 @@ export async function saveWorkScheduleAction(values: WorkScheduleValues) {
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid schedule." };
   const data = parsed.data;
   if (timeToMinutes(data.expectedTimeOut) <= timeToMinutes(data.expectedTimeIn)) return { ok: false, error: "Time out must be later than time in." };
-  const employee = await getPrisma().employee.findUniqueOrThrow({ where: { id: data.employeeId } });
-  if (employee.employeeType === "FACULTY") return { ok: false, error: "Faculty-only employees cannot have staff work schedules." };
 
   try {
+    const employee = await getPrisma().employee.findUnique({ where: { id: data.employeeId } });
+    if (!employee) return { ok: false, error: "The selected employee no longer exists." };
+    if (employee.employeeType === "FACULTY") return { ok: false, error: "Faculty-only employees cannot have staff work schedules." };
     const result = await getPrisma().$transaction(async (tx) => {
       const allRows = await tx.workSchedule.findMany({ where: { employeeId: data.employeeId, isActive: true }, orderBy: { effectiveFrom: "asc" } });
       const futureStart = allRows.map((row) => row.effectiveFrom).filter((date) => date > data.effectiveFrom).sort()[0];
@@ -67,10 +68,11 @@ export async function saveFacultyScheduleAction(values: FacultyScheduleValues) {
   const data = parsed.data;
   const start = timeToMinutes(data.startTime); const end = timeToMinutes(data.endTime);
   if (end <= start) return { ok: false, error: "End time must be later than start time." };
-  const employee = await getPrisma().employee.findUniqueOrThrow({ where: { id: data.employeeId } });
-  if (employee.employeeType === "STAFF") return { ok: false, error: "Staff employees cannot have faculty teaching schedules." };
 
   try {
+    const employee = await getPrisma().employee.findUnique({ where: { id: data.employeeId } });
+    if (!employee) return { ok: false, error: "The selected employee no longer exists." };
+    if (employee.employeeType === "STAFF") return { ok: false, error: "Staff employees cannot have faculty teaching schedules." };
     const groupId = await getPrisma().$transaction(async (tx) => {
       let effectiveTo: string | null = null;
       if (data.scheduleGroupId) {
@@ -113,20 +115,22 @@ export async function archiveScheduleAction(kind: "work" | "faculty", scheduleGr
   const admin = await requireCurrentAdmin();
   const today = todayInTimeZone();
   const yesterday = previousDate(today);
-  const rows = kind === "work"
-    ? await getPrisma().workSchedule.findMany({ where: { scheduleGroupId } })
-    : await getPrisma().facultySchedule.findMany({ where: { scheduleGroupId } });
-  if (!rows.length) return { ok: false, error: "Schedule was not found." };
-  await getPrisma().$transaction(async (tx) => {
-    if (kind === "work") {
-      await tx.workSchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { lt: today } }, data: { effectiveTo: yesterday } });
-      await tx.workSchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { gte: today } }, data: { isActive: false } });
-    } else {
-      await tx.facultySchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { lt: today } }, data: { effectiveTo: yesterday } });
-      await tx.facultySchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { gte: today } }, data: { isActive: false } });
-    }
-    await createAuditLog({ adminId: admin.id, action: "SCHEDULE_ARCHIVED", entityType: kind === "work" ? "WORK_SCHEDULE" : "FACULTY_SCHEDULE", entityId: scheduleGroupId, summary: `Schedule was ended on ${yesterday}.` }, tx);
-  });
-  revalidateSchedulePaths();
-  return { ok: true };
+  try {
+    const rows = kind === "work"
+      ? await getPrisma().workSchedule.findMany({ where: { scheduleGroupId } })
+      : await getPrisma().facultySchedule.findMany({ where: { scheduleGroupId } });
+    if (!rows.length) return { ok: false, error: "Schedule was not found." };
+    await getPrisma().$transaction(async (tx) => {
+      if (kind === "work") {
+        await tx.workSchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { lt: today } }, data: { effectiveTo: yesterday } });
+        await tx.workSchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { gte: today } }, data: { isActive: false } });
+      } else {
+        await tx.facultySchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { lt: today } }, data: { effectiveTo: yesterday } });
+        await tx.facultySchedule.updateMany({ where: { scheduleGroupId, effectiveFrom: { gte: today } }, data: { isActive: false } });
+      }
+      await createAuditLog({ adminId: admin.id, action: "SCHEDULE_ARCHIVED", entityType: kind === "work" ? "WORK_SCHEDULE" : "FACULTY_SCHEDULE", entityId: scheduleGroupId, summary: `Schedule was ended on ${yesterday}.` }, tx);
+    });
+    revalidateSchedulePaths();
+    return { ok: true };
+  } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to end the schedule." }; }
 }
