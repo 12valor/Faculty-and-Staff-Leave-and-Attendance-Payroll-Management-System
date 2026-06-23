@@ -64,6 +64,7 @@ const rulesSchema = z.object({
   absencePenaltyAmount: z.coerce.number().positive().max(1_000_000),
   regularTeachingLoadHours: z.coerce.number().min(0).max(80),
   overtimeMultiplier: z.coerce.number().positive().max(10),
+  automaticOvertimeBonus: z.coerce.number().min(0).max(10_000),
   facultyOverloadHourlyRate: z.preprocess(
     (value) => value === "" ? null : value,
     z.coerce.number().positive().max(1_000_000).nullable(),

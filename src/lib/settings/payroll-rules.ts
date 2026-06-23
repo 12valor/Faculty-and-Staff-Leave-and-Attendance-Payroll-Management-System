@@ -10,6 +10,7 @@ export const PAYROLL_SETTING_KEYS = {
   regularTeachingLoadHours: "regularTeachingLoadHours",
   overtimeMultiplier: "overtimeMultiplier",
   facultyOverloadHourlyRate: "facultyOverloadHourlyRate",
+  automaticOvertimeBonus: "automaticOvertimeBonus",
 } as const;
 
 export async function getPayrollRules() {
@@ -26,5 +27,6 @@ export async function getPayrollRules() {
     overtimeMultiplier: values.get(PAYROLL_SETTING_KEYS.overtimeMultiplier) ?? 1.25,
     facultyOverloadHourlyRate:
       values.get(PAYROLL_SETTING_KEYS.facultyOverloadHourlyRate) ?? null,
+    automaticOvertimeBonus: values.get(PAYROLL_SETTING_KEYS.automaticOvertimeBonus) ?? 150,
   };
 }

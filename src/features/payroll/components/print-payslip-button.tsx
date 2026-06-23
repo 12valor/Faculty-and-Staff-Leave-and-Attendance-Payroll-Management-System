@@ -44,8 +44,8 @@ export function PrintPayslipButton({ payroll }: { payroll: LivePayrollResult }) 
       if (payroll.overtimeRows.length) {
         worksheet.addRow([]);
         worksheet.addRow(["Overtime earnings"]);
-        worksheet.addRow(["Date", "Hours", "Hourly rate", "Multiplier", "Amount"]);
-        payroll.overtimeRows.forEach((row) => worksheet.addRow([row.date, row.hours, row.hourlyRate, row.multiplier, row.amount]));
+        worksheet.addRow(["Date", "Hours", "Amount"]);
+        payroll.overtimeRows.forEach((row) => worksheet.addRow([row.date, row.hours, row.amount]));
       }
 
       if (payroll.overloadRows.length) {

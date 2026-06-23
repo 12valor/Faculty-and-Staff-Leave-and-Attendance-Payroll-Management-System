@@ -238,19 +238,12 @@ export async function buildLivePayroll(
     sources.map((source) => [`${source.date}:${source.source}`, source]),
   );
   const overtimeRows = employee.overtimeRecords.map((record) => {
-    const calculated = calculateOvertimePay({
-      monthlySalary: Number(employee.monthlySalary),
-      workingDaysPerMonth: rules.workingDaysPerMonth,
-      standardWorkHoursPerDay: rules.standardWorkHoursPerDay,
-      overtimeMultiplier: rules.overtimeMultiplier,
-      hours: Number(record.hours),
-    });
     return {
       date: record.date,
       hours: Number(record.hours),
-      hourlyRate: calculated.hourlyRate,
-      multiplier: rules.overtimeMultiplier,
-      amount: Number(record.amount) > 0 ? Number(record.amount) : calculated.amount,
+      hourlyRate: 0,
+      multiplier: 0,
+      amount: Number(record.amount) > 0 ? Number(record.amount) : rules.automaticOvertimeBonus,
     };
   });
   const overloadRows = employee.overloadRecords.map((record) => ({
