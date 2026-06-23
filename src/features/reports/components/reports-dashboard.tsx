@@ -58,6 +58,7 @@ type ReportsDashboardProps = {
   employeeData: EmployeeReportRow[];
   defaultFrom: string;
   defaultTo: string;
+  generatedAtLabel: string;
 };
 
 export function ReportsDashboard({
@@ -69,6 +70,7 @@ export function ReportsDashboard({
   employeeData,
   defaultFrom,
   defaultTo,
+  generatedAtLabel,
 }: ReportsDashboardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -465,7 +467,7 @@ export function ReportsDashboard({
           <h2 className="text-xl font-bold tracking-tight text-primary">Faculty and Staff Payroll System</h2>
           <h3 className="text-2xl font-extrabold tracking-tight mt-1 text-slate-800">{getActiveTabTitle()}</h3>
           <p className="text-xs text-muted-foreground mt-1">
-            Generated on: {new Date().toLocaleString()} | Period: {currentFrom} to {currentTo}
+            Generated on: {generatedAtLabel} | Period: {currentFrom} to {currentTo}
           </p>
           <div className="grid grid-cols-4 gap-4 mt-4 bg-muted/20 p-3 rounded-lg border text-xs">
             <div>

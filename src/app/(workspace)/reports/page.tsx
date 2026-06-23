@@ -14,6 +14,11 @@ export const metadata = {
 export default async function ReportsPage({ searchParams }: { searchParams: SearchParams }) {
   const prisma = getPrisma();
   const today = new Date().toISOString().slice(0, 10);
+  const generatedAtLabel = new Intl.DateTimeFormat("en-PH", {
+    timeZone: "Asia/Manila",
+    dateStyle: "medium",
+    timeStyle: "medium",
+  }).format(new Date());
   
   // Default to current month range
   const dateObj = new Date();
@@ -245,6 +250,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
         employeeData={employeeData}
         defaultFrom={firstDayOfMonth}
         defaultTo={today}
+        generatedAtLabel={generatedAtLabel}
       />
     </section>
   );

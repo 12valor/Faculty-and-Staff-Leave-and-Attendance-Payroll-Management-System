@@ -108,6 +108,38 @@ export async function saveDailyAttendanceAction(date: string, rows: DailyAttenda
   } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Daily attendance was not saved." }; }
 }
 
+export async function removeAttendanceForDateAction(date: string) {
+  const admin = await requireCurrentAdmin();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Select a valid attendance date." };
+  try {
+    const lockedRecord = await getPrisma().attendanceRecord.findFirst({
+      where: {
+        date,
+        payrollBreakdowns: {
+          some: { payrollDeduction: { payrollPeriod: { status: "LOCKED" } } },
+        },
+      },
+    });
+    if (lockedRecord) return { ok: false, error: "Attendance linked to a locked payroll period cannot be removed." };
+
+    const count = await getPrisma().$transaction(async (tx) => {
+      const deleted = await tx.attendanceRecord.deleteMany({ where: { date } });
+      await createAuditLog({
+        adminId: admin.id,
+        action: "DAILY_ATTENDANCE_REMOVED",
+        entityType: "ATTENDANCE_RECORD",
+        summary: `${deleted.count} attendance row(s) were removed for ${date}.`,
+        metadata: { date, count: deleted.count },
+      }, tx);
+      return deleted.count;
+    });
+    revalidatePath("/attendance"); revalidatePath("/dashboard"); revalidatePath("/reports"); revalidatePath("/payroll");
+    return { ok: true, count };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : "Attendance could not be removed." };
+  }
+}
+
 export type CsvAttendanceRow = { employeeNumber: string; date: string; timeIn: string; timeOut: string; status: string; remarks: string };
 export async function importAttendanceAction(rows: CsvAttendanceRow[]) {
   const admin = await requireCurrentAdmin();
