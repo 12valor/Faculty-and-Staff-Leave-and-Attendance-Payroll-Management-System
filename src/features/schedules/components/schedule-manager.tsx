@@ -44,7 +44,7 @@ export function ScheduleManager({ employees, workSchedules, facultySchedules, su
   async function archive(kind: "work" | "faculty", groupId: string) { const result = await archiveScheduleAction(kind, groupId); if (!result.ok) return toast.error(result.error); toast.success("Schedule ended without removing its history."); }
 
   return <>
-    {summaries.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{summaries.map((summary) => <div key={summary.employeeLabel} className="rounded-xl border bg-card p-4"><p className="font-medium">{summary.employeeLabel}</p><div className="mt-3 flex gap-2"><Badge variant="secondary">{summary.workDays} work days</Badge><Badge variant="outline">{summary.teachingHours.toFixed(2)} daily hours</Badge></div></div>)}</div> : null}
+    {summaries.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{summaries.map((summary) => <div key={summary.employeeLabel} className="rounded-xl border bg-card p-4"><p className="font-medium">{summary.employeeLabel}</p><div className="mt-3 flex gap-2"><Badge variant="secondary">{summary.workDays} work days</Badge><Badge variant="outline">{summary.teachingHours.toFixed(2)} weekly hours</Badge></div></div>)}</div> : null}
     <Tabs defaultValue="work">
       <TabsList><TabsTrigger value="work">Staff Work Schedules</TabsTrigger><TabsTrigger value="faculty">Faculty Daily Schedules</TabsTrigger></TabsList>
       <TabsContent value="work" className="mt-4 flex flex-col gap-4">
