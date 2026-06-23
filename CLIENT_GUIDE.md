@@ -37,7 +37,7 @@ To run this application, you only need to download and install **Node.js**:
      - Detect Node.js.
      - Install all required software packages/dependencies (this happens only on the first run).
      - Verify database and server connections.
-     - Automatically open the system in your default browser at **`http://localhost:3000`**.
+     - Automatically open the system (`http://localhost:3000`) and the SQLite Database Dashboard (`http://localhost:5555`) in your default browser.
 
 ---
 

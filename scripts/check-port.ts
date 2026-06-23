@@ -1,13 +1,14 @@
 import http from 'http';
 
-const url = 'http://localhost:3000';
-const maxAttempts = 45; // 45 seconds timeout
+const port = process.argv[2] || '3000';
+const url = `http://localhost:${port}`;
+const maxAttempts = 45;
 const intervalMs = 1000;
 
 function checkServer(): Promise<boolean> {
   return new Promise((resolve) => {
+    // For Prisma Studio or Next.js, making an HTTP GET request to check availability
     const req = http.get(url, () => {
-      // If we get a response, the server is listening
       resolve(true);
     });
 
@@ -26,14 +27,13 @@ async function main() {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const connected = await checkServer();
     if (connected) {
-      console.log('\nWeb Server Connection: CONNECTED');
+      console.log(`\nConnection to port ${port}: CONNECTED`);
       process.exit(0);
     }
-    // Print progress dot
     process.stdout.write('.');
     await new Promise((r) => setTimeout(r, intervalMs));
   }
-  console.log('\nWeb Server Connection: FAILED (Timeout)');
+  console.log(`\nConnection to port ${port}: FAILED (Timeout)`);
   process.exit(1);
 }
 
