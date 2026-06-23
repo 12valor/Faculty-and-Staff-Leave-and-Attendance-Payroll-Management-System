@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Check from "@mui/icons-material/CheckCircleRounded";
 import Plus from "@mui/icons-material/AddRounded";
@@ -36,6 +36,10 @@ export function LeaveManager({ employees, records, balances, transactions }: { e
   const form = useForm<LeaveRecordValues>({ resolver: zodResolver(leaveRecordSchema), defaultValues: { ...initialValues, employeeId: employees[0]?.id ?? "" } });
   const leaveType = useWatch({ control: form.control, name: "leaveType" });
   const otherIsPaid = useWatch({ control: form.control, name: "otherIsPaid" });
+
+  useEffect(() => {
+    form.setValue("allocations", scheduledDates.filter((row) => row.dayValue > 0) as any, { shouldValidate: form.formState.isSubmitted });
+  }, [scheduledDates, form, form.formState.isSubmitted]);
 
   async function loadDates() {
     try {
