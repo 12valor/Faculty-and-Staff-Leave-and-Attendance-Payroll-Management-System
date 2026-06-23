@@ -56,7 +56,7 @@ export default async function SettingsPage() {
 }
 
 function RuleInput({ name, label, value, required = true }: { name: string; label: string; value: number | string; required?: boolean }) {
-  return <label className="flex flex-col gap-2 text-sm font-medium">{label}<Input name={name} type="number" step="0.01" min="0" defaultValue={value} required={required} /></label>;
+  return <label className="flex flex-col gap-2 text-sm font-medium">{label}<Input key={`${name}:${value}`} name={name} type="number" step="0.01" min="0" defaultValue={value} required={required} /></label>;
 }
 
 type DirectoryRow = { id: string; name: string; description: string | null; isActive: boolean };

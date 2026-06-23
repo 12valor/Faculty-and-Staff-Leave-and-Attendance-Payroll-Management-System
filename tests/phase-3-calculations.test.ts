@@ -4,6 +4,7 @@ import test from "node:test";
 import { computeMonthlyLeaveCredit, getServiceDaysForMonth, reverseLeaveDebit, splitPaidAndUnpaidDays } from "../src/lib/calculations/leave";
 import { computeWeeklyOverload, overtimeMinutesToHours } from "../src/lib/calculations/overtime-overload";
 import { calculateOverloadPay, calculateOvertimePay, calculatePayrollTotals, calculateProratedBasicPay, deduplicatePayrollSources, summarizePayrollSources } from "../src/lib/calculations/payroll";
+import { manualPayrollSchema } from "../src/features/payroll/schemas/payroll-schema";
 
 test("leave split keeps the latest dates unpaid", () => {
   const result = splitPaidAndUnpaidDays([{ date: "2026-06-01", dayValue: 1 }, { date: "2026-06-02", dayValue: 1 }, { date: "2026-06-03", dayValue: 0.5 }], 1.5);
@@ -57,4 +58,14 @@ test("overtime and overload calculations are stable", () => {
   assert.equal(overtimeMinutesToHours(90), 1.5);
   assert.equal(computeWeeklyOverload(21.5, 18), 3.5);
   assert.equal(computeWeeklyOverload(16, 18), 0);
+});
+
+test("manual payroll validates required fields and date order", () => {
+  assert.equal(manualPayrollSchema.safeParse({ employeeId: "", startDate: "", endDate: "", label: "" }).success, false);
+  const reversed = manualPayrollSchema.safeParse({ employeeId: "employee-1", startDate: "2026-06-30", endDate: "2026-06-01", label: "Demo" });
+  assert.equal(reversed.success, false);
+  assert.equal(reversed.error?.issues[0]?.message, "End date cannot be before start date.");
+
+  const valid = manualPayrollSchema.safeParse({ employeeId: "employee-1", startDate: "2026-06-01", endDate: "2026-06-15" });
+  assert.equal(valid.success, true);
 });

@@ -1,5 +1,6 @@
 import { PageTitle } from "@/components/page-title";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ManualPayrollForm } from "@/features/payroll/components/manual-payroll-form";
 import { PayrollManager } from "@/features/payroll/components/payroll-manager";
 import { PayrollSearch } from "@/features/payroll/components/payroll-search";
 import { currentMonthRange } from "@/lib/dates";
@@ -14,10 +15,10 @@ export const dynamic = "force-dynamic";
 export default async function PayrollPage({ searchParams }: { searchParams: SearchParams }) {
   const params = await searchParams;
   const search = typeof params.search === "string" ? params.search.trim() : "";
-  const defaultTab = params.tab === "advanced" ? "advanced" : "automatic";
+  const defaultTab = params.tab === "advanced" ? "advanced" : params.tab === "manual" ? "manual" : "automatic";
   const period = currentMonthRange();
   const prisma = getPrisma();
-  const [employees, periods, rules] = await Promise.all([
+  const [employees, manualEmployees, periods, rules] = await Promise.all([
     search
       ? prisma.employee.findMany({
           where: {
@@ -33,6 +34,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Sear
           take: 25,
         })
       : Promise.resolve([]),
+    prisma.employee.findMany({
+      where: { employmentStatus: "ACTIVE" },
+      include: { department: true, position: true },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    }),
     prisma.payrollPeriod.findMany({
       include: { deductions: { include: { employee: true, breakdowns: true }, orderBy: { employee: { lastName: "asc" } } } },
       orderBy: { startDate: "desc" },
@@ -46,6 +52,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Sear
       <Tabs defaultValue={defaultTab}>
         <TabsList data-print-hidden="true">
           <TabsTrigger value="automatic">Automatic Payroll</TabsTrigger>
+          <TabsTrigger value="manual">Manual / Custom Payroll</TabsTrigger>
           <TabsTrigger value="advanced">Advanced Periods</TabsTrigger>
         </TabsList>
         <TabsContent value="automatic" className="mt-5">
@@ -60,6 +67,19 @@ export default async function PayrollPage({ searchParams }: { searchParams: Sear
               department: employee.department.name,
               position: employee.position.name,
               status: employee.employmentStatus,
+            }))}
+          />
+        </TabsContent>
+        <TabsContent value="manual" className="mt-5">
+          <ManualPayrollForm
+            defaultStartDate={period.startDate}
+            defaultEndDate={period.endDate}
+            employees={manualEmployees.map((employee) => ({
+              id: employee.id,
+              employeeNumber: employee.employeeNumber,
+              fullName: [employee.firstName, employee.middleName, employee.lastName, employee.suffix].filter(Boolean).join(" "),
+              department: employee.department.name,
+              position: employee.position.name,
             }))}
           />
         </TabsContent>

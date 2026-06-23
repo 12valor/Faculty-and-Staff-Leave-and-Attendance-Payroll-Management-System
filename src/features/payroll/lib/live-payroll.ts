@@ -13,6 +13,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 
 export type LivePayrollResult = {
+  mode: "automatic" | "manual";
   employee: {
     id: string;
     employeeNumber: string;
@@ -24,6 +25,12 @@ export type LivePayrollResult = {
     monthlySalary: number;
   };
   period: { startDate: string; endDate: string; label: string };
+  availability: {
+    attendanceRecords: number;
+    leaveAllocations: number;
+    overtimeRecords: number;
+    overloadRecords: number;
+  };
   proration: { scheduledDays: number; eligibleDays: number; ratio: number };
   earnings: {
     basicPay: number;
@@ -70,18 +77,24 @@ export type LivePayrollResult = {
 export async function buildLivePayroll(
   employeeId: string,
   period: { startDate: string; endDate: string; label: string },
+  options: { mode?: "automatic" | "manual" } = {},
 ): Promise<LivePayrollResult | null> {
+  const mode = options.mode ?? "automatic";
   const [rules, employee] = await Promise.all([
     getPayrollRules(),
     getPrisma().employee.findFirst({
       where: {
         id: employeeId,
-        employmentStatus: { not: "ARCHIVED" },
-        serviceStartDate: { lte: period.endDate },
-        OR: [
-          { serviceEndDate: null },
-          { serviceEndDate: { gte: period.startDate } },
-        ],
+        ...(mode === "manual"
+          ? { employmentStatus: "ACTIVE" as const }
+          : {
+              employmentStatus: { not: "ARCHIVED" as const },
+              serviceStartDate: { lte: period.endDate },
+              OR: [
+                { serviceEndDate: null },
+                { serviceEndDate: { gte: period.startDate } },
+              ],
+            }),
       },
       include: {
         department: true,
@@ -240,6 +253,7 @@ export async function buildLivePayroll(
   });
 
   return {
+    mode,
     employee: {
       id: employee.id,
       employeeNumber: employee.employeeNumber,
@@ -258,6 +272,12 @@ export async function buildLivePayroll(
       monthlySalary: Number(employee.monthlySalary),
     },
     period,
+    availability: {
+      attendanceRecords: employee.attendanceRecords.length,
+      leaveAllocations: employee.leaveAllocations.length,
+      overtimeRecords: employee.overtimeRecords.length,
+      overloadRecords: employee.overloadRecords.length,
+    },
     proration: {
       scheduledDays: proration.scheduledDays,
       eligibleDays: proration.eligibleDays,

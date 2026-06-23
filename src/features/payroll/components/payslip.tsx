@@ -13,8 +13,14 @@ export function Payslip({ payroll, preparedBy }: { payroll: LivePayrollResult; p
       <header className="flex items-center gap-4 border-b-2 border-primary pb-5">
         <Image src="/images/tup-seal.png" alt="Technological University of the Philippines seal" width={72} height={72} className="size-16 object-contain sm:size-[72px]" priority />
         <div className="min-w-0 flex-1 text-center"><p className="text-xs font-semibold tracking-[0.16em] uppercase text-slate-500">Technological University of the Philippines</p><h2 className="mt-1 text-2xl font-bold tracking-tight">Employee Payslip</h2><p className="mt-1 text-sm text-slate-600">{payroll.period.label} | {payroll.period.startDate} to {payroll.period.endDate}</p></div>
-        <Badge variant="outline" className="hidden sm:inline-flex">Live calculation</Badge>
+        <Badge variant="outline" className="hidden sm:inline-flex">{payroll.mode === "manual" ? "Manual calculation" : "Live calculation"}</Badge>
       </header>
+
+      {payroll.availability.attendanceRecords === 0 ? (
+        <p className="mt-5 rounded-lg bg-slate-100 p-3 text-sm text-slate-700">
+          No attendance records found for this range. Payroll values are based on available data.
+        </p>
+      ) : null}
 
       <section className="mt-6 grid gap-x-8 gap-y-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2">
         <Detail label="Employee" value={payroll.employee.fullName} />
@@ -49,7 +55,7 @@ export function Payslip({ payroll, preparedBy }: { payroll: LivePayrollResult; p
       {payroll.overloadRows.length ? <DetailTable title="Faculty overload earnings" headers={["Week", "Hours", "Hourly rate", "Amount"]}>{payroll.overloadRows.map((row) => <TableRow key={row.weekStart}><TableCell className="font-mono text-xs">{row.weekStart} to {row.weekEnd}</TableCell><TableCell>{row.hours.toFixed(3)}</TableCell><TableCell className="font-mono">{money.format(row.hourlyRate)}</TableCell><TableCell className="font-mono">{money.format(row.amount)}</TableCell></TableRow>)}</DetailTable> : null}
 
       <footer className="mt-12 grid gap-12 pt-4 text-center text-sm sm:grid-cols-2"><Signature label="Prepared by" name={preparedBy} /><Signature label="Employee signature" name={payroll.employee.fullName} /></footer>
-      <p className="mt-8 text-center text-[0.65rem] text-slate-500">Live payroll generated {generatedAt}. This view does not create or lock a payroll record.</p>
+      <p className="mt-8 text-center text-[0.65rem] text-slate-500">{payroll.mode === "manual" ? "Manual" : "Live"} payroll generated {generatedAt}. This view does not create or lock a payroll record.</p>
     </article>
   );
 }
