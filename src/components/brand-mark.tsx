@@ -1,4 +1,3 @@
-import Image from "next/image";
 
 import { cn } from "@/lib/utils";
 
@@ -11,13 +10,12 @@ export function BrandMark({ compact = false, className }: BrandMarkProps) {
   return (
     <div className={cn("flex min-w-0 items-center gap-3", className)}>
       <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-primary/15 bg-card p-1.5 shadow-[0_6px_18px_rgb(127_29_29/0.1)]">
-        <Image
+        <img
           src="/images/tup-seal.png"
           alt="Technological University of the Philippines seal"
           width={48}
           height={48}
           className="size-full object-contain"
-          priority
         />
       </div>
       {compact ? null : (

@@ -1,4 +1,3 @@
-import Image from "next/image";
 
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -11,7 +10,7 @@ export function Payslip({ payroll, preparedBy }: { payroll: LivePayrollResult; p
   return (
     <article data-payslip className="mx-auto w-full max-w-5xl rounded-xl border bg-white p-5 text-slate-950 shadow-sm sm:p-8 print:border-none print:shadow-none">
       <header className="flex items-center gap-4 border-b-2 border-primary pb-5 print:pb-2">
-        <Image src="/images/tup-seal.png" alt="Technological University of the Philippines seal" width={72} height={72} className="size-16 object-contain sm:size-[72px]" priority />
+        <img src="/images/tup-seal.png" alt="Technological University of the Philippines seal" width={72} height={72} className="size-16 object-contain sm:size-[72px]" />
         <div className="min-w-0 flex-1 text-center"><p className="text-xs font-semibold tracking-[0.16em] uppercase text-slate-500">Technological University of the Philippines</p><h2 className="mt-1 text-2xl font-bold tracking-tight">Employee Payslip</h2><p className="mt-1 text-sm text-slate-600">{payroll.period.label} | {payroll.period.startDate} to {payroll.period.endDate}</p></div>
         <Badge variant="outline" className="hidden sm:inline-flex">{payroll.mode === "manual" ? "Manual calculation" : "Live calculation"}</Badge>
       </header>
