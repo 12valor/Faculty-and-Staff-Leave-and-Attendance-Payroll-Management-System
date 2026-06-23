@@ -5,35 +5,44 @@ import { revalidatePath } from "next/cache";
 import { leaveCreditPeriodSchema, leaveRecordSchema, type LeaveRecordValues } from "@/features/leave/schemas/leave-schema";
 import { computeMonthlyLeaveCredit, getServiceDaysForMonth, splitPaidAndUnpaidDays } from "@/lib/calculations/leave";
 import { createAuditLog } from "@/lib/audit";
-import { requireCurrentAdmin } from "@/lib/auth/current-admin";
+import { getActionAdmin } from "@/lib/server-action";
 import { getDayOfWeek, inclusiveDates } from "@/lib/dates";
 import { getPrisma } from "@/lib/prisma";
 
 export async function getScheduledLeaveDatesAction(employeeId: string, startDate: string, endDate: string) {
-  await requireCurrentAdmin();
-  if (!employeeId || !startDate || !endDate || endDate < startDate) return { ok: false, error: "Select a valid employee and date range." };
-  const employee = await getPrisma().employee.findUnique({ where: { id: employeeId }, include: { workSchedules: { where: { isActive: true } }, facultySchedules: { where: { isActive: true } } } });
-  if (!employee) return { ok: false, error: "Employee was not found." };
-  const dates = inclusiveDates(startDate, endDate).filter((date) => {
-    const work = employee.employeeType === "FACULTY" ? [] : employee.workSchedules;
-    const faculty = employee.employeeType === "STAFF" ? [] : employee.facultySchedules;
-    return [...work, ...faculty].some((row) => row.dayOfWeek === getDayOfWeek(date) && row.effectiveFrom <= date && (!row.effectiveTo || row.effectiveTo >= date));
-  });
-  return { ok: true, dates };
-}
+  const auth = await getActionAdmin();
+  if (!auth.ok) return auth;
 
+  if (!employeeId || !startDate || !endDate || endDate < startDate) return { ok: false, error: "Select a valid employee and date range." };
+  try {
+    const employee = await getPrisma().employee.findUnique({ where: { id: employeeId }, include: { workSchedules: { where: { isActive: true } }, facultySchedules: { where: { isActive: true } } } });
+    if (!employee) return { ok: false, error: "Employee was not found." };
+    const dates = inclusiveDates(startDate, endDate).filter((date) => {
+      const work = employee.employeeType === "FACULTY" ? [] : employee.workSchedules;
+      const faculty = employee.employeeType === "STAFF" ? [] : employee.facultySchedules;
+      return [...work, ...faculty].some((row) => row.dayOfWeek === getDayOfWeek(date) && row.effectiveFrom <= date && (!row.effectiveTo || row.effectiveTo >= date));
+    });
+    return { ok: true, dates };
+  } catch {
+    return { ok: false, error: "Unable to load scheduled leave dates." };
+  }
+}
 export async function createLeaveRecordAction(values: LeaveRecordValues) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+  if (!auth.ok) return auth;
+  const { admin } = auth;
+
   const parsed = leaveRecordSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid leave record." };
   const data = parsed.data;
   const dateSet = new Set(data.allocations.map((row) => row.date));
   if (dateSet.size !== data.allocations.length || data.allocations.some((row) => row.date < data.startDate || row.date > data.endDate)) return { ok: false, error: "Leave date allocations are invalid." };
-  const existing = await getPrisma().leaveAllocation.findFirst({ where: { employeeId: data.employeeId, date: { in: [...dateSet] }, leaveRecord: { status: { in: ["PENDING", "APPROVED"] } } } });
-  if (existing) return { ok: false, error: `A pending or approved leave already covers ${existing.date}.` };
   const total = data.allocations.reduce((sum, row) => sum + row.dayValue, 0);
   const isPaid = data.leaveType === "LEAVE_WITHOUT_PAY" ? false : data.leaveType === "OTHER" ? data.otherIsPaid : true;
+
   try {
+    const existing = await getPrisma().leaveAllocation.findFirst({ where: { employeeId: data.employeeId, date: { in: [...dateSet] }, leaveRecord: { status: { in: ["PENDING", "APPROVED"] } } } });
+    if (existing) return { ok: false, error: `A pending or approved leave already covers ${existing.date}.` };
     const record = await getPrisma().$transaction(async (tx) => {
       const created = await tx.leaveRecord.create({ data: { employeeId: data.employeeId, leaveType: data.leaveType, startDate: data.startDate, endDate: data.endDate, numberOfDays: total, isPaid, reason: data.reason || null, remarks: data.remarks || null, allocations: { create: data.allocations.map((row) => ({ employeeId: data.employeeId, date: row.date, dayValue: row.dayValue })) } } });
       await createAuditLog({ adminId: admin.id, action: "LEAVE_CREATED", entityType: "LEAVE_RECORD", entityId: created.id, summary: `Leave record for ${total} day(s) was created.`, metadata: data }, tx);
@@ -43,9 +52,10 @@ export async function createLeaveRecordAction(values: LeaveRecordValues) {
     return { ok: true, id: record.id };
   } catch { return { ok: false, error: "Unable to create the leave record." }; }
 }
-
 export async function approveLeaveAction(id: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     await getPrisma().$transaction(async (tx) => {
       const leave = await tx.leaveRecord.findUniqueOrThrow({ where: { id }, include: { allocations: { orderBy: { date: "asc" } }, employee: { include: { leaveBalance: true } } } });
@@ -76,7 +86,9 @@ export async function approveLeaveAction(id: string) {
 }
 
 export async function rejectLeaveAction(id: string, remarks?: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     await getPrisma().$transaction(async (tx) => {
       const leave = await tx.leaveRecord.findUniqueOrThrow({ where: { id } });
@@ -89,7 +101,9 @@ export async function rejectLeaveAction(id: string, remarks?: string) {
 }
 
 export async function cancelLeaveAction(id: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     await getPrisma().$transaction(async (tx) => {
       const leave = await tx.leaveRecord.findUniqueOrThrow({ where: { id }, include: { transactions: true } });
@@ -133,14 +147,17 @@ async function buildCreditPreview(year: number, month: number) {
 }
 
 export async function previewLeaveCreditsAction(year: number, month: number) {
-  await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
   const parsed = leaveCreditPeriodSchema.safeParse({ year, month });
   if (!parsed.success) return { ok: false, error: "Select a valid month and year." };
   try { return { ok: true, rows: await buildCreditPreview(year, month) }; } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to preview leave credits." }; }
 }
 
 export async function generateLeaveCreditsAction(year: number, month: number) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   const parsed = leaveCreditPeriodSchema.safeParse({ year, month });
   if (!parsed.success) return { ok: false, error: "Select a valid month and year." };
   try {

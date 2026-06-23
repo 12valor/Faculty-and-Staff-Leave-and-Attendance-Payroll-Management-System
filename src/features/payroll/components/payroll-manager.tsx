@@ -20,14 +20,57 @@ import { payrollPeriodSchema, type PayrollPeriodValues } from "@/features/payrol
 
 type PeriodRow = { id: string; name: string; startDate: string; endDate: string; status: string; totalAmount: number; employeeCount: number; deductions: PayrollPreviewRow[] };
 const today = new Date().toISOString().slice(0, 10);
+const SERVER_ACTION_ERROR = "The server connection was interrupted. Refresh the page and try again.";
 
 export function PayrollManager({ periods }: { periods: PeriodRow[] }) {
   const [createOpen, setCreateOpen] = useState(false); const [previewOpen, setPreviewOpen] = useState(false); const [previewRows, setPreviewRows] = useState<PayrollPreviewRow[]>([]); const [previewName, setPreviewName] = useState(""); const [loading, setLoading] = useState(false);
   const form = useForm<PayrollPeriodValues>({ resolver: zodResolver(payrollPeriodSchema), defaultValues: { name: "", startDate: today, endDate: today } });
-  async function create(values: PayrollPeriodValues) { const result = await createPayrollPeriodAction(values); if (!result.ok) return toast.error(result.error); toast.success("Payroll period created."); setCreateOpen(false); form.reset({ name: "", startDate: today, endDate: today }); }
-  async function preview(id: string) { setLoading(true); const result = await previewPayrollAction(id); setLoading(false); if (!result.ok || !("rows" in result)) return toast.error(result.error); setPreviewRows(result.rows); setPreviewName(result.period.name); setPreviewOpen(true); }
-  async function generate(id: string) { setLoading(true); const result = await generatePayrollAction(id); setLoading(false); if (!result.ok) return toast.error(result.error); toast.success(`${result.count} deduction summaries generated.`); }
-  async function lock(id: string) { const result = await lockPayrollPeriodAction(id); if (!result.ok) return toast.error(result.error); toast.success("Payroll period locked."); }
+  async function create(values: PayrollPeriodValues) {
+    try {
+      const result = await createPayrollPeriodAction(values);
+      if (!result.ok) return toast.error(result.error);
+      toast.success("Payroll period created.");
+      setCreateOpen(false);
+      form.reset({ name: "", startDate: today, endDate: today });
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
+  }
+  async function preview(id: string) {
+    setLoading(true);
+    try {
+      const result = await previewPayrollAction(id);
+      if (!result.ok || !("rows" in result)) return toast.error(result.error);
+      setPreviewRows(result.rows);
+      setPreviewName(result.period.name);
+      setPreviewOpen(true);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function generate(id: string) {
+    setLoading(true);
+    try {
+      const result = await generatePayrollAction(id);
+      if (!result.ok) return toast.error(result.error);
+      toast.success(`${result.count} deduction summaries generated.`);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function lock(id: string) {
+    try {
+      const result = await lockPayrollPeriodAction(id);
+      if (!result.ok) return toast.error(result.error);
+      toast.success("Payroll period locked.");
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
+  }
   function details(period: PeriodRow) { setPreviewRows(period.deductions); setPreviewName(period.name); setPreviewOpen(true); }
   return <><div className="flex justify-end"><Button onClick={() => setCreateOpen(true)}><Plus data-icon="inline-start" />Create period</Button></div><div className="overflow-x-auto rounded-xl border bg-card"><Table><TableHeader><TableRow><TableHead>Period</TableHead><TableHead>Dates</TableHead><TableHead>Status</TableHead><TableHead>Employees</TableHead><TableHead>Total deductions</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader><TableBody>{periods.length ? periods.map((period) => <TableRow key={period.id}><TableCell className="font-medium">{period.name}</TableCell><TableCell className="font-mono text-xs">{period.startDate} to {period.endDate}</TableCell><TableCell><Badge variant={period.status === "LOCKED" ? "secondary" : "outline"}>{period.status}</Badge></TableCell><TableCell>{period.employeeCount}</TableCell><TableCell className="font-mono">₱{period.totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</TableCell><TableCell><div className="flex gap-1"><Button size="icon-sm" variant="ghost" aria-label="Preview deductions" onClick={() => preview(period.id)} disabled={loading}><Eye /></Button>{period.status !== "LOCKED" ? <Button size="icon-sm" variant="ghost" aria-label="Generate deductions" onClick={() => generate(period.id)} disabled={loading}><RefreshCw /></Button> : null}{period.status === "GENERATED" ? <Button size="icon-sm" variant="ghost" aria-label="Lock payroll period" onClick={() => lock(period.id)}><LockKeyhole /></Button> : null}{period.deductions.length ? <Button size="sm" variant="outline" onClick={() => details(period)}>Details</Button> : null}</div></TableCell></TableRow>) : <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No payroll periods found.</TableCell></TableRow>}</TableBody></Table></div>
   <Dialog open={createOpen} onOpenChange={setCreateOpen}><DialogContent><DialogHeader><DialogTitle>Create payroll period</DialogTitle><DialogDescription>Payroll date ranges cannot overlap existing periods.</DialogDescription></DialogHeader><form onSubmit={form.handleSubmit(create)} className="flex flex-col gap-4"><FieldGroup><Field><FieldLabel>Name</FieldLabel><Input {...form.register("name")} /></Field><Field><FieldLabel>Start date</FieldLabel><Input type="date" {...form.register("startDate")} /></Field><Field><FieldLabel>End date</FieldLabel><Input type="date" {...form.register("endDate")} /></Field></FieldGroup><FieldError>{Object.values(form.formState.errors)[0]?.message}</FieldError><DialogFooter><Button type="button" variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button><Button type="submit">Create period</Button></DialogFooter></form></DialogContent></Dialog>

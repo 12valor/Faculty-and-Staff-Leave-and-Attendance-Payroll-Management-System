@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { facultyScheduleSchema, type FacultyScheduleValues, workScheduleSchema, type WorkScheduleValues } from "@/features/schedules/schemas/schedule-schema";
 import { createAuditLog } from "@/lib/audit";
-import { requireCurrentAdmin } from "@/lib/auth/current-admin";
+import { getActionAdmin } from "@/lib/server-action";
 import { timeToMinutes } from "@/lib/calculations/attendance";
 import { previousDate, todayInTimeZone } from "@/lib/dates";
 import { getPrisma } from "@/lib/prisma";
@@ -22,7 +22,9 @@ function revalidateSchedulePaths() {
 }
 
 export async function saveWorkScheduleAction(values: WorkScheduleValues) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   const parsed = workScheduleSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid schedule." };
   const data = parsed.data;
@@ -61,7 +63,9 @@ export async function saveWorkScheduleAction(values: WorkScheduleValues) {
 }
 
 export async function saveFacultyScheduleAction(values: FacultyScheduleValues) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   const parsed = facultyScheduleSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid schedule." };
   const data = parsed.data;
@@ -111,7 +115,9 @@ export async function saveFacultyScheduleAction(values: FacultyScheduleValues) {
 }
 
 export async function archiveScheduleAction(kind: "work" | "faculty", scheduleGroupId: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   const today = todayInTimeZone();
   const yesterday = previousDate(today);
   try {

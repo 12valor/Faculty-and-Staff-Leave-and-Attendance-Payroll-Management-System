@@ -4,11 +4,13 @@ import { revalidatePath } from "next/cache";
 
 import { employeeSchema, type EmployeeValues } from "@/features/employees/schemas/employee-schema";
 import { createAuditLog } from "@/lib/audit";
-import { requireCurrentAdmin } from "@/lib/auth/current-admin";
 import { getPrisma } from "@/lib/prisma";
+import { getActionAdmin } from "@/lib/server-action";
 
 export async function saveEmployeeAction(values: EmployeeValues) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+  if (!auth.ok) return auth;
+  const { admin } = auth;
   const parsed = employeeSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid employee data." };
   const { id, monthlySalary, middleName, suffix, remarks, serviceEndDate, ...rest } = parsed.data;
@@ -33,13 +35,19 @@ export async function saveEmployeeAction(values: EmployeeValues) {
 }
 
 export async function setEmployeeStatusAction(id: string, status: "ACTIVE" | "INACTIVE" | "ARCHIVED") {
-  const admin = await requireCurrentAdmin();
-  const employee = await getPrisma().employee.update({ where: { id }, data: { employmentStatus: status } });
-  await createAuditLog({ adminId: admin.id, action: status === "ARCHIVED" ? "EMPLOYEE_ARCHIVED" : "EMPLOYEE_STATUS_CHANGED", entityType: "EMPLOYEE", entityId: id, summary: `Employee ${employee.employeeNumber} status changed to ${status}.` });
-  revalidatePath("/employees");
-  revalidatePath("/dashboard");
-  revalidatePath("/schedules");
-  revalidatePath("/payroll");
-  revalidatePath("/attendance");
-  return { ok: true };
+  const auth = await getActionAdmin();
+  if (!auth.ok) return auth;
+  const { admin } = auth;
+  try {
+    const employee = await getPrisma().employee.update({ where: { id }, data: { employmentStatus: status } });
+    await createAuditLog({ adminId: admin.id, action: status === "ARCHIVED" ? "EMPLOYEE_ARCHIVED" : "EMPLOYEE_STATUS_CHANGED", entityType: "EMPLOYEE", entityId: id, summary: `Employee ${employee.employeeNumber} status changed to ${status}.` });
+    revalidatePath("/employees");
+    revalidatePath("/dashboard");
+    revalidatePath("/schedules");
+    revalidatePath("/payroll");
+    revalidatePath("/attendance");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: "Unable to update employee status." };
+  }
 }

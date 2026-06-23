@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { payrollPeriodSchema, type PayrollPeriodValues } from "@/features/payroll/schemas/payroll-schema";
 import { describeAttendancePenalty, getPayrollSourceAmount, summarizePayrollSources, type PayrollSource } from "@/lib/calculations/payroll";
 import { createAuditLog } from "@/lib/audit";
-import { requireCurrentAdmin } from "@/lib/auth/current-admin";
+import { getActionAdmin } from "@/lib/server-action";
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 import { resolveScheduleForDateFromAllRows } from "@/features/schedules/lib/resolve-schedule";
@@ -17,11 +17,16 @@ export type PayrollPreviewRow = {
 };
 
 export async function createPayrollPeriodAction(values: PayrollPeriodValues) {
-  const admin = await requireCurrentAdmin(); const parsed = payrollPeriodSchema.safeParse(values);
+  const auth = await getActionAdmin();
+  if (!auth.ok) return auth;
+  const { admin } = auth;
+
+  const parsed = payrollPeriodSchema.safeParse(values);
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid payroll period." };
-  const overlap = await getPrisma().payrollPeriod.findFirst({ where: { startDate: { lte: parsed.data.endDate }, endDate: { gte: parsed.data.startDate } } });
-  if (overlap) return { ok: false, error: `Dates overlap payroll period ${overlap.name}.` };
+
   try {
+    const overlap = await getPrisma().payrollPeriod.findFirst({ where: { startDate: { lte: parsed.data.endDate }, endDate: { gte: parsed.data.startDate } } });
+    if (overlap) return { ok: false, error: `Dates overlap payroll period ${overlap.name}.` };
     const period = await getPrisma().$transaction(async (tx) => {
       const created = await tx.payrollPeriod.create({ data: { ...parsed.data, createdById: admin.id } });
       await createAuditLog({ adminId: admin.id, action: "PAYROLL_PERIOD_CREATED", entityType: "PAYROLL_PERIOD", entityId: created.id, summary: `Payroll period ${created.name} was created.` }, tx);
@@ -62,12 +67,15 @@ async function buildPayrollPreview(periodId: string): Promise<{ period: { id: st
 }
 
 export async function previewPayrollAction(periodId: string) {
-  await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
   try { return { ok: true, ...(await buildPayrollPreview(periodId)) }; } catch { return { ok: false, error: "Unable to preview payroll deductions." }; }
 }
 
 export async function generatePayrollAction(periodId: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     const preview = await buildPayrollPreview(periodId);
     if (preview.period.status === "LOCKED") throw new Error("Locked payroll periods cannot be regenerated.");
@@ -82,7 +90,9 @@ export async function generatePayrollAction(periodId: string) {
 }
 
 export async function lockPayrollPeriodAction(periodId: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     await getPrisma().$transaction(async (tx) => {
       const period = await tx.payrollPeriod.findUniqueOrThrow({ where: { id: periodId } });

@@ -27,6 +27,7 @@ export type EmployeeRow = EmployeeValues & { id: string; departmentName: string;
 type Mode = "create" | "edit" | "view";
 
 const emptyValues: EmployeeValues = { employeeNumber: "", firstName: "", middleName: "", lastName: "", suffix: "", employeeType: "STAFF", departmentId: "", positionId: "", monthlySalary: 0, serviceStartDate: new Date().toISOString().slice(0, 10), serviceEndDate: "", employmentStatus: "ACTIVE", remarks: "" };
+const SERVER_ACTION_ERROR = "The server connection was interrupted. Refresh the page and try again.";
 
 export function EmployeeManager({ employees, departments, positions }: { employees: EmployeeRow[]; departments: Reference[]; positions: Reference[] }) {
   const [open, setOpen] = useState(false);
@@ -42,16 +43,25 @@ export function EmployeeManager({ employees, departments, positions }: { employe
   }
 
   async function submit(values: EmployeeValues) {
-    const result = await saveEmployeeAction(values);
-    if (!result.ok) return toast.error(result.error);
-    toast.success(values.id ? "Employee updated." : "Employee created.");
-    setOpen(false);
+    try {
+      const result = await saveEmployeeAction(values);
+      if (!result.ok) return toast.error(result.error);
+      toast.success(values.id ? "Employee updated." : "Employee created.");
+      setOpen(false);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
   }
 
   async function changeStatus(employee: EmployeeRow) {
     const status = employee.employmentStatus === "ARCHIVED" ? "ACTIVE" : "ARCHIVED";
-    await setEmployeeStatusAction(employee.id, status);
-    toast.success(status === "ARCHIVED" ? "Employee archived." : "Employee reactivated.");
+    try {
+      const result = await setEmployeeStatusAction(employee.id, status);
+      if (!result.ok) return toast.error(result.error);
+      toast.success(status === "ARCHIVED" ? "Employee archived." : "Employee reactivated.");
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
   }
 
   const columns: ColumnDef<EmployeeRow>[] = [

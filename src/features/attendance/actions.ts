@@ -8,7 +8,7 @@ import { isFutureAttendanceDate } from "@/lib/calculations/attendance";
 import { attendanceEntrySchema, bulkAttendanceSchema, type AttendanceEntryValues } from "@/features/attendance/schemas/attendance-schema";
 import type { AttendanceEntryMethod, AttendanceStatus } from "@/generated/prisma/client";
 import { createAuditLog } from "@/lib/audit";
-import { requireCurrentAdmin } from "@/lib/auth/current-admin";
+import { getActionAdmin } from "@/lib/server-action";
 import { getPrisma } from "@/lib/prisma";
 
 async function prepare(values: AttendanceEntryValues) {
@@ -32,7 +32,8 @@ function attendanceData(prepared: Awaited<ReturnType<typeof prepare>>, entryMeth
 }
 
 export async function previewAttendanceAction(values: AttendanceEntryValues) {
-  await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
   try {
     const prepared = await prepare(values);
     return { ok: true, preview: { schedule: prepared.calculation.schedule, computedStatus: prepared.calculation.computedStatus, finalStatus: prepared.calculation.status, lateMinutes: prepared.calculation.lateMinutes, undertimeMinutes: prepared.calculation.undertimeMinutes, overtimeMinutes: prepared.calculation.overtimeMinutes, deductionDayValue: prepared.calculation.deductionDayValue, deductionAmount: prepared.calculation.deductionAmount } };
@@ -40,7 +41,9 @@ export async function previewAttendanceAction(values: AttendanceEntryValues) {
 }
 
 export async function saveManualAttendanceAction(values: AttendanceEntryValues) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     const prepared = await prepare(values);
     const existing = await getPrisma().attendanceRecord.findUnique({ where: { employeeId_date: { employeeId: prepared.value.employeeId, date: prepared.value.date } } });
@@ -57,7 +60,9 @@ export async function saveManualAttendanceAction(values: AttendanceEntryValues) 
 }
 
 export async function saveBulkAttendanceAction(rows: AttendanceEntryValues[]) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   const parsed = bulkAttendanceSchema.safeParse({ rows });
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid bulk attendance rows." };
   try {
@@ -83,7 +88,9 @@ export type DailyAttendanceRow = {
 };
 
 export async function saveDailyAttendanceAction(date: string, rows: DailyAttendanceRow[]) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !rows.length) return { ok: false, error: "Select a valid date with attendance rows." };
   const employeeIds = [...new Set(rows.map((row) => row.employeeId))];
   if (employeeIds.length !== rows.length) return { ok: false, error: "Duplicate employees were found in the daily attendance rows." };
@@ -120,7 +127,9 @@ export async function saveDailyAttendanceAction(date: string, rows: DailyAttenda
 }
 
 export async function removeAttendanceForDateAction(date: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return { ok: false, error: "Select a valid attendance date." };
   try {
     const lockedRecord = await getPrisma().attendanceRecord.findFirst({
@@ -153,19 +162,22 @@ export async function removeAttendanceForDateAction(date: string) {
 
 export type CsvAttendanceRow = { employeeNumber: string; date: string; timeIn: string; timeOut: string; status: string; remarks: string };
 export async function importAttendanceAction(rows: CsvAttendanceRow[]) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+  if (!auth.ok) return auth;
+  const { admin } = auth;
+
   if (!rows.length) return { ok: false, error: "The CSV file has no data rows." };
-  const employeeNumbers = [...new Set(rows.map((row) => row.employeeNumber))];
-  const employees = await getPrisma().employee.findMany({ where: { employeeNumber: { in: employeeNumbers } } });
-  const employeeMap = new Map(employees.map((employee) => [employee.employeeNumber, employee]));
-  const missing = employeeNumbers.filter((number) => !employeeMap.has(number));
-  if (missing.length) return { ok: false, error: `Unknown employee numbers: ${missing.join(", ")}` };
-  const values: AttendanceEntryValues[] = rows.map((row) => ({ employeeId: employeeMap.get(row.employeeNumber)!.id, date: row.date, timeIn: row.timeIn, timeOut: row.timeOut, statusOverride: row.status as AttendanceStatus, overrideReason: row.remarks || "Status supplied by CSV import.", remarks: row.remarks }));
-  const keys = new Set<string>();
-  for (const value of values) { const key = `${value.employeeId}:${value.date}`; if (keys.has(key)) return { ok: false, error: "The CSV contains duplicate employee/date rows." }; keys.add(key); }
-  const existing = await getPrisma().attendanceRecord.findMany({ where: { OR: values.map((row) => ({ employeeId: row.employeeId, date: row.date })) } });
-  if (existing.length) return { ok: false, error: "CSV import rejected: one or more employee/date records already exist." };
   try {
+    const employeeNumbers = [...new Set(rows.map((row) => row.employeeNumber))];
+    const employees = await getPrisma().employee.findMany({ where: { employeeNumber: { in: employeeNumbers } } });
+    const employeeMap = new Map(employees.map((employee) => [employee.employeeNumber, employee]));
+    const missing = employeeNumbers.filter((number) => !employeeMap.has(number));
+    if (missing.length) return { ok: false, error: `Unknown employee numbers: ${missing.join(", ")}` };
+    const values: AttendanceEntryValues[] = rows.map((row) => ({ employeeId: employeeMap.get(row.employeeNumber)!.id, date: row.date, timeIn: row.timeIn, timeOut: row.timeOut, statusOverride: row.status as AttendanceStatus, overrideReason: row.remarks || "Status supplied by CSV import.", remarks: row.remarks }));
+    const keys = new Set<string>();
+    for (const value of values) { const key = `${value.employeeId}:${value.date}`; if (keys.has(key)) return { ok: false, error: "The CSV contains duplicate employee/date rows." }; keys.add(key); }
+    const existing = await getPrisma().attendanceRecord.findMany({ where: { OR: values.map((row) => ({ employeeId: row.employeeId, date: row.date })) } });
+    if (existing.length) return { ok: false, error: "CSV import rejected: one or more employee/date records already exist." };
     const prepared = await Promise.all(values.map(prepare));
     await getPrisma().$transaction(prepared.map((item) => getPrisma().attendanceRecord.create({ data: attendanceData(item, "CSV_IMPORT") })));
     const affectedEmployees = [...new Set(values.map((v) => v.employeeId))];

@@ -27,6 +27,7 @@ type TransactionRow = { id: string; employee: string; createdAt: string; transac
 type CreditPreview = { employeeId: string; employee: string; serviceDays: number; lwopDays: number; vacationEarned: number; sickEarned: number; oldVacation: number; oldSick: number; newVacation: number; newSick: number; alreadyGenerated: boolean };
 
 const today = new Date().toISOString().slice(0, 10);
+const SERVER_ACTION_ERROR = "The server connection was interrupted. Refresh the page and try again.";
 const initialValues: LeaveRecordValues = { employeeId: "", leaveType: "VACATION", startDate: today, endDate: today, otherIsPaid: true, reason: "", remarks: "", allocations: [] };
 
 export function LeaveManager({ employees, records, balances, transactions }: { employees: EmployeeOption[]; records: LeaveRow[]; balances: BalanceRow[]; transactions: TransactionRow[] }) {
@@ -37,24 +38,36 @@ export function LeaveManager({ employees, records, balances, transactions }: { e
   const otherIsPaid = useWatch({ control: form.control, name: "otherIsPaid" });
 
   async function loadDates() {
-    const result = await getScheduledLeaveDatesAction(form.getValues("employeeId"), form.getValues("startDate"), form.getValues("endDate"));
-    if (!result.ok) return toast.error(result.error);
-    const dates = result.dates ?? [];
-    if (!dates.length) return toast.error("No active scheduled dates fall inside this range.");
-    setScheduledDates(dates.map((date) => ({ date, dayValue: 1 })));
+    try {
+      const result = await getScheduledLeaveDatesAction(form.getValues("employeeId"), form.getValues("startDate"), form.getValues("endDate"));
+      if (!result.ok) return toast.error(result.error);
+      const dates = result.dates ?? [];
+      if (!dates.length) return toast.error("No active scheduled dates fall inside this range.");
+      setScheduledDates(dates.map((date) => ({ date, dayValue: 1 })));
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
   }
 
   async function submit(values: LeaveRecordValues) {
     const allocations = scheduledDates.filter((row) => row.dayValue > 0).map((row) => ({ date: row.date, dayValue: row.dayValue as 0.5 | 1 }));
-    const result = await createLeaveRecordAction({ ...values, allocations });
-    if (!result.ok) return toast.error(result.error);
-    toast.success("Leave record created."); setOpen(false); setScheduledDates([]); form.reset({ ...initialValues, employeeId: employees[0]?.id ?? "" });
+    try {
+      const result = await createLeaveRecordAction({ ...values, allocations });
+      if (!result.ok) return toast.error(result.error);
+      toast.success("Leave record created."); setOpen(false); setScheduledDates([]); form.reset({ ...initialValues, employeeId: employees[0]?.id ?? "" });
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
   }
 
   async function decide(action: "approve" | "reject" | "cancel", id: string) {
-    const result = action === "approve" ? await approveLeaveAction(id) : action === "reject" ? await rejectLeaveAction(id) : await cancelLeaveAction(id);
-    if (!result.ok) return toast.error(result.error);
-    toast.success(`Leave ${action === "approve" ? "approved" : action === "reject" ? "rejected" : "cancelled"}.`);
+    try {
+      const result = action === "approve" ? await approveLeaveAction(id) : action === "reject" ? await rejectLeaveAction(id) : await cancelLeaveAction(id);
+      if (!result.ok) return toast.error(result.error);
+      toast.success(`Leave ${action === "approve" ? "approved" : action === "reject" ? "rejected" : "cancelled"}.`);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
   }
 
   return <Tabs defaultValue="records" className="flex flex-col gap-4">
@@ -75,8 +88,31 @@ export function LeaveManager({ employees, records, balances, transactions }: { e
 
 function LeaveCreditPanel() {
   const now = new Date(); const [year, setYear] = useState(now.getFullYear()); const [month, setMonth] = useState(now.getMonth() + 1); const [rows, setRows] = useState<CreditPreview[]>([]); const [loading, setLoading] = useState(false);
-  async function preview() { setLoading(true); const result = await previewLeaveCreditsAction(year, month); setLoading(false); if (!result.ok) return toast.error(result.error); setRows(result.rows ?? []); }
-  async function generate() { setLoading(true); const result = await generateLeaveCreditsAction(year, month); setLoading(false); if (!result.ok) return toast.error(result.error); toast.success(`${result.count} leave-credit record(s) generated.`); await preview(); }
+  async function preview() {
+    setLoading(true);
+    try {
+      const result = await previewLeaveCreditsAction(year, month);
+      if (!result.ok) return toast.error(result.error);
+      setRows(result.rows ?? []);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function generate() {
+    setLoading(true);
+    try {
+      const result = await generateLeaveCreditsAction(year, month);
+      if (!result.ok) return toast.error(result.error);
+      toast.success(`${result.count} leave-credit record(s) generated.`);
+      await preview();
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    } finally {
+      setLoading(false);
+    }
+  }
   return <div className="flex flex-col gap-4"><div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"><Field><FieldLabel>Month</FieldLabel><Input type="number" min="1" max="12" value={month} onChange={(event) => setMonth(Number(event.target.value))} /></Field><Field><FieldLabel>Year</FieldLabel><Input type="number" min="2000" max="2100" value={year} onChange={(event) => setYear(Number(event.target.value))} /></Field><Button variant="outline" onClick={preview} disabled={loading}>Preview</Button><Button onClick={generate} disabled={loading || !rows.some((row) => !row.alreadyGenerated)}>Generate credits</Button></div><DataTable headers={["Employee", "Service", "LWOP", "VL earned", "SL earned", "Old VL", "Old SL", "New VL", "New SL", "Status"]} empty="Choose a month and preview leave credits.">{rows.map((row) => <TableRow key={row.employeeId}><TableCell className="font-medium">{row.employee}</TableCell><TableCell className="font-mono">{row.serviceDays}</TableCell><TableCell className="font-mono">{row.lwopDays}</TableCell><TableCell className="font-mono">{row.vacationEarned.toFixed(3)}</TableCell><TableCell className="font-mono">{row.sickEarned.toFixed(3)}</TableCell><TableCell className="font-mono">{row.oldVacation.toFixed(3)}</TableCell><TableCell className="font-mono">{row.oldSick.toFixed(3)}</TableCell><TableCell className="font-mono">{row.newVacation.toFixed(3)}</TableCell><TableCell className="font-mono">{row.newSick.toFixed(3)}</TableCell><TableCell><Badge variant={row.alreadyGenerated ? "outline" : "secondary"}>{row.alreadyGenerated ? "Generated" : "Ready"}</Badge></TableCell></TableRow>)}</DataTable></div>;
 }
 

@@ -17,12 +17,43 @@ import { decideOverloadAction, decideOvertimeAction, generateOverloadAction, gen
 type OvertimeRow = { id: string; employee: string; department: string; date: string; minutes: number; hours: number; status: string; remarks: string };
 type OverloadRow = { id: string; employee: string; department: string; weekStart: string; weekEnd: string; totalTeachingHours: number; regularLoadHours: number; overloadHours: number; status: string; remarks: string };
 const today = new Date().toISOString().slice(0, 10);
+const SERVER_ACTION_ERROR = "The server connection was interrupted. Refresh the page and try again.";
 
 export function OvertimeOverloadManager({ overtime, overload }: { overtime: OvertimeRow[]; overload: OverloadRow[] }) {
   const [from, setFrom] = useState(today); const [to, setTo] = useState(today); const [week, setWeek] = useState(today); const [loading, setLoading] = useState(false);
-  async function generateOvertime() { setLoading(true); const result = await generateOvertimeAction(from, to); setLoading(false); if (!result.ok) return toast.error(result.error); toast.success(`${result.count} overtime record(s) generated.`); }
-  async function generateOverload() { setLoading(true); const result = await generateOverloadAction(week); setLoading(false); if (!result.ok || !("weekStart" in result)) return toast.error(result.error); toast.success(`${result.count} overload record(s) generated for week ${result.weekStart}.`); }
-  async function decide(kind: "overtime" | "overload", id: string, status: "APPROVED" | "REJECTED") { const result = kind === "overtime" ? await decideOvertimeAction(id, status) : await decideOverloadAction(id, status); if (!result.ok) return toast.error(result.error); toast.success(`${kind === "overtime" ? "Overtime" : "Overload"} ${status.toLowerCase()}.`); }
+  async function generateOvertime() {
+    setLoading(true);
+    try {
+      const result = await generateOvertimeAction(from, to);
+      if (!result.ok) return toast.error(result.error);
+      toast.success(`${result.count} overtime record(s) generated.`);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function generateOverload() {
+    setLoading(true);
+    try {
+      const result = await generateOverloadAction(week);
+      if (!result.ok || !("weekStart" in result)) return toast.error(result.error);
+      toast.success(`${result.count} overload record(s) generated for week ${result.weekStart}.`);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    } finally {
+      setLoading(false);
+    }
+  }
+  async function decide(kind: "overtime" | "overload", id: string, status: "APPROVED" | "REJECTED") {
+    try {
+      const result = kind === "overtime" ? await decideOvertimeAction(id, status) : await decideOverloadAction(id, status);
+      if (!result.ok) return toast.error(result.error);
+      toast.success(`${kind === "overtime" ? "Overtime" : "Overload"} ${status.toLowerCase()}.`);
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
+    }
+  }
   const pendingOvertime = overtime.filter((row) => row.status === "PENDING").length; const approvedHours = overtime.filter((row) => row.status === "APPROVED").reduce((sum, row) => sum + row.hours, 0); const pendingOverload = overload.filter((row) => row.status === "PENDING").length; const approvedOverload = overload.filter((row) => row.status === "APPROVED").reduce((sum, row) => sum + row.overloadHours, 0);
   return <div className="flex flex-col gap-5"><div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4"><Summary title="Pending overtime" value={String(pendingOvertime)} /><Summary title="Approved OT hours" value={approvedHours.toFixed(3)} /><Summary title="Pending overload" value={String(pendingOverload)} /><Summary title="Approved overload hours" value={approvedOverload.toFixed(3)} /></div><Tabs defaultValue="overtime"><TabsList><TabsTrigger value="overtime">Staff Overtime</TabsTrigger><TabsTrigger value="overload">Faculty Overload</TabsTrigger></TabsList><TabsContent value="overtime" className="mt-4 flex flex-col gap-4"><div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"><Field><FieldLabel>From</FieldLabel><Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} /></Field><Field><FieldLabel>To</FieldLabel><Input type="date" value={to} onChange={(event) => setTo(event.target.value)} /></Field><Button onClick={generateOvertime} disabled={loading}>Generate overtime</Button></div><RecordTable headers={["Date", "Employee", "Minutes", "Hours", "Status", "Remarks", "Actions"]} empty="No overtime records found.">{overtime.map((row) => <TableRow key={row.id}><TableCell className="font-mono">{row.date}</TableCell><EmployeeCell name={row.employee} department={row.department} /><TableCell>{row.minutes}</TableCell><TableCell className="font-mono">{row.hours.toFixed(3)}</TableCell><Status value={row.status} /><TableCell>{row.remarks || "—"}</TableCell><DecisionButtons pending={row.status === "PENDING"} onApprove={() => decide("overtime", row.id, "APPROVED")} onReject={() => decide("overtime", row.id, "REJECTED")} /></TableRow>)}</RecordTable></TabsContent><TabsContent value="overload" className="mt-4 flex flex-col gap-4"><div className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4"><Field><FieldLabel>Week containing</FieldLabel><Input type="date" value={week} onChange={(event) => setWeek(event.target.value)} /></Field><Button onClick={generateOverload} disabled={loading}>Generate weekly overload</Button></div><RecordTable headers={["Week", "Employee", "Teaching", "Regular load", "Overload", "Status", "Remarks", "Actions"]} empty="No overload records found.">{overload.map((row) => <TableRow key={row.id}><TableCell className="font-mono text-xs">{row.weekStart}<br />{row.weekEnd}</TableCell><EmployeeCell name={row.employee} department={row.department} /><TableCell className="font-mono">{row.totalTeachingHours.toFixed(3)}</TableCell><TableCell className="font-mono">{row.regularLoadHours.toFixed(3)}</TableCell><TableCell className="font-mono">{row.overloadHours.toFixed(3)}</TableCell><Status value={row.status} /><TableCell>{row.remarks || "—"}</TableCell><DecisionButtons pending={row.status === "PENDING"} onApprove={() => decide("overload", row.id, "APPROVED")} onReject={() => decide("overload", row.id, "REJECTED")} /></TableRow>)}</RecordTable></TabsContent></Tabs></div>;
 }

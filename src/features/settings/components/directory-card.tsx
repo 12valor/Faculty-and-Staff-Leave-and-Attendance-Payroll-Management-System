@@ -8,24 +8,33 @@ import { Input } from "@/components/ui/input";
 import { saveDepartmentAction, savePositionAction, toggleDepartmentAction, togglePositionAction } from "@/features/settings/actions";
 
 type DirectoryRow = { id: string; name: string; description: string | null; isActive: boolean };
+const SERVER_ACTION_ERROR = "The server connection was interrupted. Refresh the page and try again.";
 
 export function DirectoryCard({ title, description, rows, kind }: { title: string; description: string; rows: DirectoryRow[]; kind: "department" | "position" }) {
   const saveAction = kind === "department" ? saveDepartmentAction : savePositionAction;
   const toggleAction = kind === "department" ? toggleDepartmentAction : togglePositionAction;
 
   async function handleSave(formData: FormData) {
-    const result = await saveAction(formData);
-    if (result && !result.ok) {
-      toast.error(result.error);
-    } else {
-      toast.success(`${title.slice(0, -1)} saved.`);
+    try {
+      const result = await saveAction(formData);
+      if (result && !result.ok) {
+        toast.error(result.error);
+      } else {
+        toast.success(`${title.slice(0, -1)} saved.`);
+      }
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
     }
   }
 
   async function handleToggle(formData: FormData) {
-    const result = await toggleAction(formData);
-    if (result && !result.ok) {
-      toast.error(result.error);
+    try {
+      const result = await toggleAction(formData);
+      if (result && !result.ok) {
+        toast.error(result.error);
+      }
+    } catch {
+      toast.error(SERVER_ACTION_ERROR);
     }
   }
 

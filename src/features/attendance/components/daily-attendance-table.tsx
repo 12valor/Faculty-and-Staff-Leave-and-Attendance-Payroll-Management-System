@@ -16,6 +16,8 @@ import { removeAttendanceForDateAction, saveDailyAttendanceAction } from "@/feat
 import type { AttendanceStatus } from "@/generated/prisma/client";
 import { calculateAttendancePenaltyShared, isPast5PM, isFutureAttendanceDate, isBefore8AM } from "@/lib/calculations/attendance";
 
+const SERVER_ACTION_ERROR = "The server connection was interrupted. Refresh the page and try again.";
+
 export type DailyAttendanceEmployee = {
   employeeId: string;
   employeeName: string;
@@ -64,22 +66,26 @@ export function DailyAttendanceTable({
 
   function save() {
     startSaving(async () => {
-      const result = await saveDailyAttendanceAction(date, rows.map((row) => {
-        const initial = initialRows.get(row.employeeId);
-        return {
-          employeeId: row.employeeId,
-          timeIn: row.timeIn,
-          timeOut: row.timeOut,
-          remarks: row.remarks,
-          preserveOverride: Boolean(row.isStatusOverridden && initial && initial.timeIn === row.timeIn && initial.timeOut === row.timeOut && initial.remarks === row.remarks),
-        };
-      }));
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
+      try {
+        const result = await saveDailyAttendanceAction(date, rows.map((row) => {
+          const initial = initialRows.get(row.employeeId);
+          return {
+            employeeId: row.employeeId,
+            timeIn: row.timeIn,
+            timeOut: row.timeOut,
+            remarks: row.remarks,
+            preserveOverride: Boolean(row.isStatusOverridden && initial && initial.timeIn === row.timeIn && initial.timeOut === row.timeOut && initial.remarks === row.remarks),
+          };
+        }));
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        toast.success(`${result.count} attendance row(s) saved.`);
+        router.refresh();
+      } catch {
+        toast.error(SERVER_ACTION_ERROR);
       }
-      toast.success(`${result.count} attendance row(s) saved.`);
-      router.refresh();
     });
   }
 
@@ -95,7 +101,7 @@ export function DailyAttendanceTable({
         toast.success(`${result.count} attendance row(s) removed. You can encode the date again.`);
         router.refresh();
       } catch {
-        toast.error("Unable to remove attendance. Refresh the page and try again.");
+        toast.error(SERVER_ACTION_ERROR);
       }
     });
   }

@@ -5,13 +5,15 @@ import { revalidatePath } from "next/cache";
 import { computeWeeklyOverload, overtimeMinutesToHours } from "@/lib/calculations/overtime-overload";
 import { calculateOverloadPay, calculateOvertimePay } from "@/lib/calculations/payroll";
 import { createAuditLog } from "@/lib/audit";
-import { requireCurrentAdmin } from "@/lib/auth/current-admin";
+import { getActionAdmin } from "@/lib/server-action";
 import { weekBounds } from "@/lib/dates";
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 
 export async function generateOvertimeAction(startDate: string, endDate: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   if (!startDate || !endDate || endDate < startDate) return { ok: false, error: "Select a valid overtime date range." };
   try {
     const records = await getPrisma().attendanceRecord.findMany({ where: { date: { gte: startDate, lte: endDate }, overtimeMinutes: { gt: 0 }, employee: { employeeType: { in: ["STAFF", "FACULTY_WITH_STAFF_WORK"] }, employmentStatus: "ACTIVE" }, overtimeRecord: null } });
@@ -24,7 +26,9 @@ export async function generateOvertimeAction(startDate: string, endDate: string)
 }
 
 export async function decideOvertimeAction(id: string, status: "APPROVED" | "REJECTED", remarks?: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     const rules = await getPayrollRules();
     await getPrisma().$transaction(async (tx) => {
@@ -39,7 +43,9 @@ export async function decideOvertimeAction(id: string, status: "APPROVED" | "REJ
 }
 
 export async function generateOverloadAction(selectedDate: string) {
-  const admin = await requireCurrentAdmin(); if (!selectedDate) return { ok: false, error: "Select a week." };
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth; if (!selectedDate) return { ok: false, error: "Select a week." };
   const { start, end } = weekBounds(selectedDate);
   try {
     const [rules, employees] = await Promise.all([getPayrollRules(), getPrisma().employee.findMany({ where: { employmentStatus: "ACTIVE", employeeType: { in: ["FACULTY", "FACULTY_WITH_STAFF_WORK"] } }, include: { facultySchedules: { where: { isActive: true } } } })]);
@@ -54,7 +60,9 @@ export async function generateOverloadAction(selectedDate: string) {
 }
 
 export async function decideOverloadAction(id: string, status: "APPROVED" | "REJECTED", remarks?: string) {
-  const admin = await requireCurrentAdmin();
+  const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
   try {
     const rules = await getPayrollRules();
     if (status === "APPROVED" && rules.facultyOverloadHourlyRate === null) throw new Error("Set the faculty overload hourly rate in Settings before approving overload.");

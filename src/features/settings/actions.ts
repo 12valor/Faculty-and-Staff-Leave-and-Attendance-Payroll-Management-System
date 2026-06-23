@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 
 import { createAuditLog } from "@/lib/audit";
-import { requireCurrentAdmin } from "@/lib/auth/current-admin";
+import { getActionAdmin } from "@/lib/server-action";
 import { getPrisma } from "@/lib/prisma";
 import { PAYROLL_SETTING_KEYS } from "@/lib/settings/payroll-rules";
 
@@ -21,7 +21,9 @@ function text(formData: FormData, key: string) {
 
 export async function saveDepartmentAction(formData: FormData) {
   try {
-    const admin = await requireCurrentAdmin();
+    const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
     const data = directorySchema.parse({ id: text(formData, "id") || undefined, name: text(formData, "name"), description: text(formData, "description") || undefined });
     const department = data.id
       ? await getPrisma().department.update({ where: { id: data.id }, data: { name: data.name, description: data.description } })
@@ -36,7 +38,9 @@ export async function saveDepartmentAction(formData: FormData) {
 
 export async function toggleDepartmentAction(formData: FormData) {
   try {
-    const admin = await requireCurrentAdmin();
+    const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
     const id = text(formData, "id");
     const current = await getPrisma().department.findUniqueOrThrow({ where: { id } });
     const department = await getPrisma().department.update({ where: { id }, data: { isActive: !current.isActive } });
@@ -50,7 +54,9 @@ export async function toggleDepartmentAction(formData: FormData) {
 
 export async function savePositionAction(formData: FormData) {
   try {
-    const admin = await requireCurrentAdmin();
+    const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
     const data = directorySchema.parse({ id: text(formData, "id") || undefined, name: text(formData, "name"), description: text(formData, "description") || undefined });
     const position = data.id
       ? await getPrisma().position.update({ where: { id: data.id }, data: { name: data.name, description: data.description } })
@@ -65,7 +71,9 @@ export async function savePositionAction(formData: FormData) {
 
 export async function togglePositionAction(formData: FormData) {
   try {
-    const admin = await requireCurrentAdmin();
+    const auth = await getActionAdmin();
+if (!auth.ok) return auth;
+const { admin } = auth;
     const id = text(formData, "id");
     const current = await getPrisma().position.findUniqueOrThrow({ where: { id } });
     const position = await getPrisma().position.update({ where: { id }, data: { isActive: !current.isActive } });
@@ -92,23 +100,31 @@ const rulesSchema = z.object({
 });
 
 export async function savePayrollRulesAction(formData: FormData) {
-  const admin = await requireCurrentAdmin();
-  const rules = rulesSchema.parse(Object.fromEntries(formData));
-  for (const [key, value] of Object.entries(rules)) {
-    const settingKey = PAYROLL_SETTING_KEYS[key as keyof typeof PAYROLL_SETTING_KEYS];
-    if (value === null) {
-      await getPrisma().systemSetting.deleteMany({ where: { key: settingKey } });
-      continue;
+  const auth = await getActionAdmin();
+  if (!auth.ok) return auth;
+  const { admin } = auth;
+
+  try {
+    const rules = rulesSchema.parse(Object.fromEntries(formData));
+    for (const [key, value] of Object.entries(rules)) {
+      const settingKey = PAYROLL_SETTING_KEYS[key as keyof typeof PAYROLL_SETTING_KEYS];
+      if (value === null) {
+        await getPrisma().systemSetting.deleteMany({ where: { key: settingKey } });
+        continue;
+      }
+      await getPrisma().systemSetting.upsert({
+        where: { key: settingKey },
+        update: { value: String(value) },
+        create: { key: settingKey, value: String(value), valueType: "number" },
+      });
     }
-    await getPrisma().systemSetting.upsert({
-      where: { key: settingKey },
-      update: { value: String(value) },
-      create: { key: settingKey, value: String(value), valueType: "number" },
-    });
+    await createAuditLog({ adminId: admin.id, action: "PAYROLL_RULES_UPDATED", entityType: "SYSTEM_SETTING", summary: "Payroll rules were updated.", metadata: rules });
+    revalidatePath("/settings");
+    revalidatePath("/payroll");
+    revalidatePath("/overtime-overload");
+    revalidatePath("/attendance");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof z.ZodError ? "Check the payroll rule values and try again." : "Unable to save payroll rules." };
   }
-  await createAuditLog({ adminId: admin.id, action: "PAYROLL_RULES_UPDATED", entityType: "SYSTEM_SETTING", summary: "Payroll rules were updated.", metadata: rules });
-  revalidatePath("/settings");
-  revalidatePath("/payroll");
-  revalidatePath("/overtime-overload");
-  revalidatePath("/attendance");
 }

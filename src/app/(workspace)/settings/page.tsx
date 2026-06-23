@@ -4,10 +4,9 @@ import BookOpenCheck from "@mui/icons-material/MenuBookRounded";
 import { PageTitle } from "@/components/page-title";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DirectoryCard } from "@/features/settings/components/directory-card";
-import { savePayrollRulesAction } from "@/features/settings/actions";
+import { PayrollRulesForm } from "@/features/settings/components/payroll-rules-form";
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 
@@ -37,17 +36,7 @@ export default async function SettingsPage() {
           <Card>
             <CardHeader><CardTitle>Payroll Rules</CardTitle><CardDescription>Defaults used by attendance deductions and future payroll generation.</CardDescription></CardHeader>
             <CardContent>
-              <form action={savePayrollRulesAction} className="grid gap-4 md:grid-cols-2">
-                <RuleInput name="workingDaysPerMonth" label="Working days per month" value={rules.workingDaysPerMonth} />
-                <RuleInput name="standardWorkHoursPerDay" label="Standard work hours per day" value={rules.standardWorkHoursPerDay} />
-                <label className="flex flex-col gap-2 text-sm font-medium">Late grace minutes (fixed)<Input name="lateGraceMinutes" type="number" value={15} readOnly aria-readonly="true" /><span className="text-xs font-normal text-muted-foreground">Attendance always uses a 15-minute grace period.</span></label>
-                <RuleInput name="absencePenaltyAmount" label="Absence / 8-hour late penalty (₱)" value={rules.absencePenaltyAmount} />
-                <RuleInput name="regularTeachingLoadHours" label="Regular teaching load hours" value={rules.regularTeachingLoadHours} />
-                <RuleInput name="automaticOvertimeBonus" label="Automatic overtime bonus per day (₱)" value={rules.automaticOvertimeBonus} />
-                <RuleInput name="facultyOverloadHourlyRate" label="Faculty overload rate per hour" value={rules.facultyOverloadHourlyRate ?? ""} required={false} />
-                {rules.facultyOverloadHourlyRate === null ? <p className="md:col-span-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Set the faculty overload hourly rate before viewing automatic payroll.</p> : null}
-                <div className="md:col-span-2"><Button type="submit">Save payroll rules</Button></div>
-              </form>
+              <PayrollRulesForm rules={rules} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -55,9 +44,4 @@ export default async function SettingsPage() {
     </section>
   );
 }
-
-function RuleInput({ name, label, value, required = true }: { name: string; label: string; value: number | string; required?: boolean }) {
-  return <label className="flex flex-col gap-2 text-sm font-medium">{label}<Input key={`${name}:${value}`} name={name} type="number" step="0.01" min="0" defaultValue={value} required={required} /></label>;
-}
-
 
