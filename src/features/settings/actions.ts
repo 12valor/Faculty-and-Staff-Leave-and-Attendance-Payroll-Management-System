@@ -20,41 +20,61 @@ function text(formData: FormData, key: string) {
 }
 
 export async function saveDepartmentAction(formData: FormData) {
-  const admin = await requireCurrentAdmin();
-  const data = directorySchema.parse({ id: text(formData, "id") || undefined, name: text(formData, "name"), description: text(formData, "description") || undefined });
-  const department = data.id
-    ? await getPrisma().department.update({ where: { id: data.id }, data: { name: data.name, description: data.description } })
-    : await getPrisma().department.create({ data: { name: data.name, description: data.description } });
-  await createAuditLog({ adminId: admin.id, action: data.id ? "DEPARTMENT_UPDATED" : "DEPARTMENT_CREATED", entityType: "DEPARTMENT", entityId: department.id, summary: `${department.name} was ${data.id ? "updated" : "created"}.` });
-  revalidatePath("/settings");
+  try {
+    const admin = await requireCurrentAdmin();
+    const data = directorySchema.parse({ id: text(formData, "id") || undefined, name: text(formData, "name"), description: text(formData, "description") || undefined });
+    const department = data.id
+      ? await getPrisma().department.update({ where: { id: data.id }, data: { name: data.name, description: data.description } })
+      : await getPrisma().department.create({ data: { name: data.name, description: data.description } });
+    await createAuditLog({ adminId: admin.id, action: data.id ? "DEPARTMENT_UPDATED" : "DEPARTMENT_CREATED", entityType: "DEPARTMENT", entityId: department.id, summary: `${department.name} was ${data.id ? "updated" : "created"}.` });
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error && error.message.includes("Unique constraint") ? "Department name already exists." : "Unable to save department." };
+  }
 }
 
 export async function toggleDepartmentAction(formData: FormData) {
-  const admin = await requireCurrentAdmin();
-  const id = text(formData, "id");
-  const current = await getPrisma().department.findUniqueOrThrow({ where: { id } });
-  const department = await getPrisma().department.update({ where: { id }, data: { isActive: !current.isActive } });
-  await createAuditLog({ adminId: admin.id, action: "DEPARTMENT_STATUS_CHANGED", entityType: "DEPARTMENT", entityId: id, summary: `${department.name} was ${department.isActive ? "reactivated" : "deactivated"}.` });
-  revalidatePath("/settings");
+  try {
+    const admin = await requireCurrentAdmin();
+    const id = text(formData, "id");
+    const current = await getPrisma().department.findUniqueOrThrow({ where: { id } });
+    const department = await getPrisma().department.update({ where: { id }, data: { isActive: !current.isActive } });
+    await createAuditLog({ adminId: admin.id, action: "DEPARTMENT_STATUS_CHANGED", entityType: "DEPARTMENT", entityId: id, summary: `${department.name} was ${department.isActive ? "reactivated" : "deactivated"}.` });
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: "Unable to update status." };
+  }
 }
 
 export async function savePositionAction(formData: FormData) {
-  const admin = await requireCurrentAdmin();
-  const data = directorySchema.parse({ id: text(formData, "id") || undefined, name: text(formData, "name"), description: text(formData, "description") || undefined });
-  const position = data.id
-    ? await getPrisma().position.update({ where: { id: data.id }, data: { name: data.name, description: data.description } })
-    : await getPrisma().position.create({ data: { name: data.name, description: data.description } });
-  await createAuditLog({ adminId: admin.id, action: data.id ? "POSITION_UPDATED" : "POSITION_CREATED", entityType: "POSITION", entityId: position.id, summary: `${position.name} was ${data.id ? "updated" : "created"}.` });
-  revalidatePath("/settings");
+  try {
+    const admin = await requireCurrentAdmin();
+    const data = directorySchema.parse({ id: text(formData, "id") || undefined, name: text(formData, "name"), description: text(formData, "description") || undefined });
+    const position = data.id
+      ? await getPrisma().position.update({ where: { id: data.id }, data: { name: data.name, description: data.description } })
+      : await getPrisma().position.create({ data: { name: data.name, description: data.description } });
+    await createAuditLog({ adminId: admin.id, action: data.id ? "POSITION_UPDATED" : "POSITION_CREATED", entityType: "POSITION", entityId: position.id, summary: `${position.name} was ${data.id ? "updated" : "created"}.` });
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error && error.message.includes("Unique constraint") ? "Position name already exists." : "Unable to save position." };
+  }
 }
 
 export async function togglePositionAction(formData: FormData) {
-  const admin = await requireCurrentAdmin();
-  const id = text(formData, "id");
-  const current = await getPrisma().position.findUniqueOrThrow({ where: { id } });
-  const position = await getPrisma().position.update({ where: { id }, data: { isActive: !current.isActive } });
-  await createAuditLog({ adminId: admin.id, action: "POSITION_STATUS_CHANGED", entityType: "POSITION", entityId: id, summary: `${position.name} was ${position.isActive ? "reactivated" : "deactivated"}.` });
-  revalidatePath("/settings");
+  try {
+    const admin = await requireCurrentAdmin();
+    const id = text(formData, "id");
+    const current = await getPrisma().position.findUniqueOrThrow({ where: { id } });
+    const position = await getPrisma().position.update({ where: { id }, data: { isActive: !current.isActive } });
+    await createAuditLog({ adminId: admin.id, action: "POSITION_STATUS_CHANGED", entityType: "POSITION", entityId: id, summary: `${position.name} was ${position.isActive ? "reactivated" : "deactivated"}.` });
+    revalidatePath("/settings");
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: "Unable to update status." };
+  }
 }
 
 const rulesSchema = z.object({
