@@ -21,7 +21,11 @@ export async function saveEmployeeAction(values: EmployeeValues) {
       const employee = await getPrisma().employee.create({ data: { ...rest, monthlySalary, middleName: middleName || null, suffix: suffix || null, serviceEndDate: serviceEndDate || null, remarks: remarks || null, leaveBalance: { create: {} } } });
       await createAuditLog({ adminId: admin.id, action: "EMPLOYEE_CREATED", entityType: "EMPLOYEE", entityId: employee.id, summary: `Employee ${employee.employeeNumber} was created.` });
     }
-    revalidatePath("/", "layout");
+    revalidatePath("/employees");
+    revalidatePath("/dashboard");
+    revalidatePath("/schedules");
+    revalidatePath("/payroll");
+    revalidatePath("/attendance");
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error instanceof Error && error.message.includes("Unique constraint") ? "Employee number already exists." : "Unable to save employee." };
@@ -32,6 +36,10 @@ export async function setEmployeeStatusAction(id: string, status: "ACTIVE" | "IN
   const admin = await requireCurrentAdmin();
   const employee = await getPrisma().employee.update({ where: { id }, data: { employmentStatus: status } });
   await createAuditLog({ adminId: admin.id, action: status === "ARCHIVED" ? "EMPLOYEE_ARCHIVED" : "EMPLOYEE_STATUS_CHANGED", entityType: "EMPLOYEE", entityId: id, summary: `Employee ${employee.employeeNumber} status changed to ${status}.` });
-  revalidatePath("/", "layout");
+  revalidatePath("/employees");
+  revalidatePath("/dashboard");
+  revalidatePath("/schedules");
+  revalidatePath("/payroll");
+  revalidatePath("/attendance");
   return { ok: true };
 }
