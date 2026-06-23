@@ -7,7 +7,7 @@ import PrintRoundedIcon from "@mui/icons-material/PrintRounded";
 import { toast } from "sonner";
 import { buttonVariants } from "@/components/ui/button";
 import type { LivePayrollResult } from "@/features/payroll/lib/live-payroll";
-import { downloadBlob, printPage } from "@/lib/export/browser";
+import { downloadBlob, printElement } from "@/lib/export/browser";
 import { createWorkbook } from "@/lib/export/excel";
 
 export function PrintPayslipButton({ payroll }: { payroll: LivePayrollResult }) {
@@ -86,10 +86,17 @@ export function PrintPayslipButton({ payroll }: { payroll: LivePayrollResult }) 
 
   function printPayroll() {
     try {
-      printPage();
+      printElement(
+        "[data-payslip]",
+        `Payroll ${payroll.employee.employeeNumber} - ${payroll.period.label}`,
+      );
     } catch (error) {
       console.error("Payroll printing failed:", error);
-      toast.error("Could not open the print dialog. Please try again.");
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Could not open the payroll print window.",
+      );
     }
   }
 

@@ -99,7 +99,7 @@ export function AppShell({ children, admin }: AppShellProps) {
 
       </aside>
 
-      <div className="lg:pl-[17rem]">
+      <div data-print-shell-content="true" className="lg:pl-[17rem]">
         <header
           data-print-hidden="true"
           className="sticky top-0 z-40 flex h-20 items-center justify-between border-b bg-card/95 px-4 backdrop-blur md:px-8"
