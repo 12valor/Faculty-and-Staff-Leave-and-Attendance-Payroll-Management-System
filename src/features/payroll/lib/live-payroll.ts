@@ -34,7 +34,12 @@ export type LivePayrollResult = {
     overtimeRecords: number;
     overloadRecords: number;
   };
-  proration: { scheduledDays: number; eligibleDays: number; ratio: number };
+  basis: {
+    dailyRate: number;
+    daysPresent: number;
+    paidLeaveDays: number;
+    totalPaidDays: number;
+  };
   earnings: {
     basicPay: number;
     overtimePay: number;
@@ -138,18 +143,24 @@ export async function buildLivePayroll(
     throw new Error("FACULTY_OVERLOAD_RATE_REQUIRED");
   }
 
-  const scheduledDays = new Set<DayOfWeek>([
-    ...employee.workSchedules.map((row) => row.dayOfWeek),
-    ...employee.facultySchedules.map((row) => row.dayOfWeek),
-  ]);
-  const proration = calculateProratedBasicPay({
-    monthlySalary: Number(employee.monthlySalary),
-    periodStart: period.startDate,
-    periodEnd: period.endDate,
-    serviceStart: employee.serviceStartDate,
-    serviceEnd: employee.serviceEndDate,
-    scheduledDays: [...scheduledDays],
-  });
+  const dailyRate = Number(employee.monthlySalary) / rules.workingDaysPerMonth;
+
+  let daysPresent = 0;
+  for (const record of employee.attendanceRecords) {
+    if (record.status === "NO_SCHEDULE") continue;
+    if (record.status === "ABSENT" && !resolveScheduleForDateFromAllRows(employee.employeeType, record.date, employee.workSchedules, employee.facultySchedules)) continue;
+    if (record.status !== "ABSENT" && record.status !== "ON_LEAVE") {
+      daysPresent += 1;
+    }
+  }
+
+  let paidLeaveDays = 0;
+  for (const allocation of employee.leaveAllocations) {
+    paidLeaveDays += Number(allocation.paidDayValue);
+  }
+
+  const totalPaidDays = daysPresent + paidLeaveDays;
+  const computedBasicPay = totalPaidDays * dailyRate;
 
   const allocations = new Map(
     employee.leaveAllocations.map((row) => [
@@ -182,8 +193,9 @@ export async function buildLivePayroll(
       continue;
     }
 
-    const dayValue =
-      record.status === "ABSENT" ? 1 : Number(record.deductionDayValue);
+    if (record.status === "ABSENT") continue;
+
+    const dayValue = Number(record.deductionDayValue);
     if (dayValue <= 0 && record.lateMinutes <= 0 && record.undertimeMinutes <= 0) continue;
     sources.push({
       date: record.date,
@@ -203,15 +215,7 @@ export async function buildLivePayroll(
   }
 
   for (const allocation of employee.leaveAllocations) {
-    const unpaid = Number(allocation.unpaidDayValue);
-    if (unpaid <= 0 || attendanceDates.has(allocation.date)) continue;
-    sources.push({
-      date: allocation.date,
-      source: "LEAVE_WITHOUT_PAY",
-      lwopDayValue: unpaid,
-      dayValue: unpaid,
-      description: "Approved unpaid leave without attendance entry",
-    });
+    // Unpaid leaves are simply excluded from totalPaidDays, so we don't need a deduction source for LWOP.
   }
 
   const deductionSummary = summarizePayrollSources(
@@ -254,7 +258,7 @@ export async function buildLivePayroll(
   const overtimePay = overtimeRows.reduce((sum, row) => sum + row.amount, 0);
   const overloadPay = overloadRows.reduce((sum, row) => sum + row.amount, 0);
   const totals = calculatePayrollTotals({
-    basicPay: proration.amount,
+    basicPay: computedBasicPay,
     overtimePay,
     overloadPay,
     deductions: deductionSummary.amount,
@@ -286,13 +290,14 @@ export async function buildLivePayroll(
       overtimeRecords: employee.overtimeRecords.length,
       overloadRecords: employee.overloadRecords.length,
     },
-    proration: {
-      scheduledDays: proration.scheduledDays,
-      eligibleDays: proration.eligibleDays,
-      ratio: proration.ratio,
+    basis: {
+      dailyRate: Number(dailyRate.toFixed(2)),
+      daysPresent,
+      paidLeaveDays,
+      totalPaidDays,
     },
     earnings: {
-      basicPay: proration.amount,
+      basicPay: Number(computedBasicPay.toFixed(2)),
       overtimePay: Number(overtimePay.toFixed(2)),
       overloadPay: Number(overloadPay.toFixed(2)),
       grossPay: totals.grossPay,

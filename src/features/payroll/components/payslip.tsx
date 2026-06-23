@@ -33,21 +33,19 @@ export function Payslip({ payroll, preparedBy }: { payroll: LivePayrollResult; p
 
       <section className="mt-6 grid gap-5 lg:grid-cols-2">
         <SummaryTable title="Earnings" rows={[
-          ["Prorated basic pay", payroll.earnings.basicPay],
+          ["Basic pay", payroll.earnings.basicPay],
           ["Approved overtime", payroll.earnings.overtimePay],
           ["Approved faculty overload", payroll.earnings.overloadPay],
         ]} totalLabel="Gross pay" total={payroll.earnings.grossPay} />
         <SummaryTable title="Deductions" rows={[
           [`Late threshold (${payroll.deductions.totalLateMinutes} min)`, deductionPart(payroll, "late")],
           [`Undertime (${payroll.deductions.totalUndertimeMinutes} min, no deduction)`, 0],
-          [`Absence (${payroll.deductions.absenceDays.toFixed(3)} day)`, deductionPart(payroll, "absence")],
-          [`Leave without pay (${payroll.deductions.lwopDays.toFixed(3)} day)`, deductionPart(payroll, "lwop")],
         ]} totalLabel="Total deductions" total={payroll.deductions.total} />
       </section>
 
       <div className="mt-5 flex flex-col justify-between gap-4 rounded-lg bg-primary px-5 py-4 text-primary-foreground sm:flex-row sm:items-center"><div><p className="text-xs font-semibold tracking-wider uppercase opacity-80">Net pay</p><p className="mt-1 text-sm opacity-80">Gross earnings less attendance and LWOP deductions</p></div><p className="font-mono text-3xl font-bold tabular-nums">{money.format(payroll.netPay)}</p></div>
 
-      <section className="mt-6"><h3 className="mb-3 text-sm font-bold tracking-wider uppercase text-slate-600">Payroll basis</h3><div className="grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-3"><Detail label="Monthly salary" value={money.format(payroll.employee.monthlySalary)} mono /><Detail label="Eligible scheduled days" value={`${payroll.proration.eligibleDays} of ${payroll.proration.scheduledDays}`} mono /><Detail label="Basic-pay factor" value={`${(payroll.proration.ratio * 100).toFixed(2)}%`} mono /></div></section>
+      <section className="mt-6"><h3 className="mb-3 text-sm font-bold tracking-wider uppercase text-slate-600">Payroll basis</h3><div className="grid gap-3 rounded-lg border p-4 text-sm sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5"><Detail label="Monthly salary" value={money.format(payroll.employee.monthlySalary)} mono /><Detail label="Daily rate" value={money.format(payroll.basis.dailyRate)} mono /><Detail label="Days present" value={`${payroll.basis.daysPresent}`} mono /><Detail label="Paid leave days" value={`${payroll.basis.paidLeaveDays}`} mono /><Detail label="Total paid days" value={`${payroll.basis.totalPaidDays}`} mono /></div></section>
 
       {payroll.deductionRows.length ? <DetailTable title="Deduction breakdown" headers={["Date", "Reason", "Late", "Undertime", "Penalty units", "Amount"]}>{payroll.deductionRows.map((row) => <TableRow key={`${row.date}-${row.source}`}><TableCell className="font-mono text-xs">{row.date}</TableCell><TableCell><p className="font-medium">{row.description}</p><p className="text-xs text-slate-500">{row.source.replaceAll("_", " ")}</p></TableCell><TableCell>{row.lateMinutes}</TableCell><TableCell>{row.undertimeMinutes}</TableCell><TableCell>{row.dayValue.toFixed(3)}</TableCell><TableCell className="font-mono">{money.format(row.amount)}</TableCell></TableRow>)}</DetailTable> : null}
 
