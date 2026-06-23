@@ -40,8 +40,8 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
   });
   const range = payrollPeriod ? { startDate: payrollPeriod.startDate, endDate: payrollPeriod.endDate } : getPeriodOrMonthRange(date);
 
-  const [dailyEmployees, employees, departments, records, rules, conversions, dailyRecordsInPeriod] = await Promise.all([
-    getPrisma().employee.findMany({ where: { employmentStatus: "ACTIVE" }, include: { department: true, position: true, workSchedules: { where: scheduleWhere }, facultySchedules: { where: scheduleWhere }, attendanceRecords: { where: { date } }, leaveAllocations: { where: { date, leaveRecord: { status: "APPROVED" } } } }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
+  const [dailyEmployees, employees, departments, records, rules, conversions, dailyRecordsInPeriod, approvedHistoryLeaves] = await Promise.all([
+    getPrisma().employee.findMany({ where: { employmentStatus: "ACTIVE" }, include: { department: true, position: true, workSchedules: { where: scheduleWhere }, facultySchedules: { where: scheduleWhere }, attendanceRecords: { where: { date } }, leaveAllocations: { where: { date, leaveRecord: { status: "APPROVED" } }, include: { leaveRecord: true } } }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
     getPrisma().employee.findMany({ where: { employmentStatus: "ACTIVE" }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
     getPrisma().department.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     getPrisma().attendanceRecord.findMany({ where: { employeeId, status, entryMethod, date: from || to ? { gte: from, lte: to } : undefined, employee: { departmentId, employeeType } }, include: { employee: { include: { department: true } } }, orderBy: [{ date: "desc" }, { employee: { lastName: "asc" } }] }),
@@ -51,8 +51,21 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
       where: {
         date: { gte: range.startDate, lt: date }
       }
+    }),
+    getPrisma().leaveAllocation.findMany({
+      where: {
+        employeeId,
+        date: from || to ? { gte: from, lte: to } : undefined,
+        leaveRecord: { status: "APPROVED" },
+        employee: { departmentId, employeeType }
+      },
+      select: { employeeId: true, date: true, leaveRecord: { select: { leaveType: true } } }
     })
   ]);
+
+  const historyLeaveTypes = new Map(
+    approvedHistoryLeaves.map((allocation) => [`${allocation.employeeId}:${allocation.date}`, allocation.leaveRecord.leaveType])
+  );
 
   const dailyRows: DailyAttendanceEmployee[] = dailyEmployees.map((employee) => {
     const record = employee.attendanceRecords[0];
@@ -92,6 +105,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
       position: employee.position.name,
       schedule: resolveScheduleFromRows(employee.employeeType, employee.workSchedules, employee.facultySchedules),
       approvedLeave: employee.leaveAllocations.length > 0,
+      approvedLeaveType: employee.leaveAllocations[0]?.leaveRecord.leaveType ?? null,
       timeIn: record?.timeIn ?? "",
       timeOut: record?.timeOut ?? "",
       remarks: record?.remarks ?? "",
@@ -105,11 +119,11 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
     };
   });
 
-  const conversionTable = conversions.map((row) => ({ unit: row.unit as any, value: row.value, equivalentDay: Number(row.equivalentDay) }));
+  const conversionTable = conversions.map((row) => ({ unit: row.unit as "HOUR" | "MINUTE", value: row.value, equivalentDay: Number(row.equivalentDay) }));
 
   return <section className="flex flex-col gap-6">
     <PageTitle title="Attendance" description="Encode daily attendance automatically or review the complete attendance history." actions={<><Button nativeButton={false} render={<Link href="/attendance/manual" />} variant="outline"><AddRoundedIcon data-icon="inline-start" />Manual Entry</Button><Button nativeButton={false} render={<Link href="/attendance/import" />} variant="outline"><UploadFileRoundedIcon data-icon="inline-start" />CSV Import</Button></>} />
-    <Tabs defaultValue={tab}><TabsList><TabsTrigger value="daily">Daily Encoding</TabsTrigger><TabsTrigger value="history">Attendance History</TabsTrigger></TabsList><TabsContent value="daily" className="mt-4"><DailyAttendanceTable key={date} date={date} employees={dailyRows} conversions={conversionTable} /></TabsContent><TabsContent value="history" className="mt-4 flex flex-col gap-4"><HistoryFilters employees={employees} departments={departments} values={{ employeeId, departmentId, employeeType, status, entryMethod, from, to }} /><HistoryTable records={records} /></TabsContent></Tabs>
+    <Tabs defaultValue={tab}><TabsList><TabsTrigger value="daily">Daily Encoding</TabsTrigger><TabsTrigger value="history">Attendance History</TabsTrigger></TabsList><TabsContent value="daily" className="mt-4"><DailyAttendanceTable key={date} date={date} employees={dailyRows} conversions={conversionTable} /></TabsContent><TabsContent value="history" className="mt-4 flex flex-col gap-4"><HistoryFilters employees={employees} departments={departments} values={{ employeeId, departmentId, employeeType, status, entryMethod, from, to }} /><HistoryTable records={records} leaveTypes={historyLeaveTypes} /></TabsContent></Tabs>
   </section>;
 }
 
@@ -118,8 +132,8 @@ function HistoryFilters({ employees, departments, values }: { employees: Array<{
 }
 
 type HistoryRecord = Prisma.AttendanceRecordGetPayload<{ include: { employee: { include: { department: true } } } }>;
-function HistoryTable({ records }: { records: HistoryRecord[] }) {
-  return <div className="data-table-shell"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Employee</TableHead><TableHead>Times</TableHead><TableHead>Rendered</TableHead><TableHead>Status</TableHead><TableHead>Minutes</TableHead><TableHead>Deduction</TableHead><TableHead>Method</TableHead><TableHead>Remarks</TableHead><TableHead /></TableRow></TableHeader><TableBody>{records.length ? records.map((record) => <TableRow key={record.id}><TableCell className="font-medium">{record.date}</TableCell><TableCell><p className="font-medium">{record.employee.lastName}, {record.employee.firstName}</p><p className="text-xs text-muted-foreground">{record.employee.employeeNumber} · {record.employee.department.name}</p></TableCell><TableCell>{record.timeIn ?? "—"}–{record.timeOut ?? "—"}</TableCell><TableCell>{record.renderedMinutes ? `${Math.floor(record.renderedMinutes / 60)}h ${record.renderedMinutes % 60}m` : "—"}</TableCell><TableCell><StatusBadge status={record.status} overridden={record.isStatusOverridden} /></TableCell><TableCell className="text-xs leading-5">Late {record.lateMinutes}<br />Under {record.undertimeMinutes}<br />OT {record.overtimeMinutes}</TableCell><TableCell className="font-semibold">₱{Number(record.deductionAmount).toFixed(2)}</TableCell><TableCell><Badge variant="outline">{record.entryMethod.replaceAll("_", " ")}</Badge></TableCell><TableCell className="max-w-52 truncate">{record.remarks || record.overrideReason || "—"}</TableCell><TableCell><Button nativeButton={false} render={<Link href={`/attendance/manual?id=${record.id}`} />} size="icon-sm" variant="ghost" aria-label="Edit attendance"><EditRoundedIcon /></Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={10} className="h-28 text-center text-muted-foreground">No attendance records found.</TableCell></TableRow>}</TableBody></Table></div>;
+function HistoryTable({ records, leaveTypes }: { records: HistoryRecord[]; leaveTypes: Map<string, string> }) {
+  return <div className="data-table-shell"><Table><TableHeader><TableRow><TableHead>Date</TableHead><TableHead>Employee</TableHead><TableHead>Times</TableHead><TableHead>Rendered</TableHead><TableHead>Status</TableHead><TableHead>Minutes</TableHead><TableHead>Deduction</TableHead><TableHead>Method</TableHead><TableHead>Remarks</TableHead><TableHead /></TableRow></TableHeader><TableBody>{records.length ? records.map((record) => <TableRow key={record.id}><TableCell className="font-medium">{record.date}</TableCell><TableCell><p className="font-medium">{record.employee.lastName}, {record.employee.firstName}</p><p className="text-xs text-muted-foreground">{record.employee.employeeNumber} · {record.employee.department.name}</p></TableCell><TableCell>{record.timeIn ?? "—"}–{record.timeOut ?? "—"}</TableCell><TableCell>{record.renderedMinutes ? `${Math.floor(record.renderedMinutes / 60)}h ${record.renderedMinutes % 60}m` : "—"}</TableCell><TableCell><StatusBadge status={record.status} overridden={record.isStatusOverridden} leaveType={leaveTypes.get(`${record.employeeId}:${record.date}`)} /></TableCell><TableCell className="text-xs leading-5">Late {record.lateMinutes}<br />Under {record.undertimeMinutes}<br />OT {record.overtimeMinutes}</TableCell><TableCell className="font-semibold">₱{Number(record.deductionAmount).toFixed(2)}</TableCell><TableCell><Badge variant="outline">{record.entryMethod.replaceAll("_", " ")}</Badge></TableCell><TableCell className="max-w-52 truncate">{record.remarks || record.overrideReason || "—"}</TableCell><TableCell><Button nativeButton={false} render={<Link href={`/attendance/manual?id=${record.id}`} />} size="icon-sm" variant="ghost" aria-label="Edit attendance"><EditRoundedIcon /></Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={10} className="h-28 text-center text-muted-foreground">No attendance records found.</TableCell></TableRow>}</TableBody></Table></div>;
 }
 
 function value(input: string | string[] | undefined) { return typeof input === "string" && input ? input : undefined; }
