@@ -90,7 +90,7 @@ export function AppShell({ children, admin }: AppShellProps) {
         <div className="flex h-24 items-center border-b px-5">
           <BrandMark />
         </div>
-        <div className="flex-1 overflow-y-auto px-3.5 py-6">
+        <div className="flex-1 overflow-y-auto px-3.5 py-6 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
           <p className="mb-3 px-3.5 text-[0.66rem] font-bold tracking-[0.16em] text-muted-foreground uppercase">
             Workspace
           </p>
@@ -139,7 +139,7 @@ export function AppShell({ children, admin }: AppShellProps) {
                     Navigate between management modules.
                   </SheetDescription>
                 </SheetHeader>
-                <div className="overflow-y-auto px-3.5 py-5">
+                <div className="overflow-y-auto px-3.5 py-5 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   <p className="mb-3 px-3.5 text-[0.66rem] font-bold tracking-[0.16em] text-muted-foreground uppercase">
                     Workspace
                   </p>
