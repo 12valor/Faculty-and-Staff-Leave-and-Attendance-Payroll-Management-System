@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { computeMonthlyLeaveCredit, getServiceDaysForMonth, reverseLeaveDebit, splitPaidAndUnpaidDays } from "../src/lib/calculations/leave";
 import { computeWeeklyOverload, overtimeMinutesToHours } from "../src/lib/calculations/overtime-overload";
-import { deduplicatePayrollSources, summarizePayrollSources } from "../src/lib/calculations/payroll";
+import { calculateOverloadPay, calculateOvertimePay, calculatePayrollTotals, calculateProratedBasicPay, deduplicatePayrollSources, summarizePayrollSources } from "../src/lib/calculations/payroll";
 
 test("leave split keeps the latest dates unpaid", () => {
   const result = splitPaidAndUnpaidDays([{ date: "2026-06-01", dayValue: 1 }, { date: "2026-06-02", dayValue: 1 }, { date: "2026-06-03", dayValue: 0.5 }], 1.5);
@@ -26,6 +26,31 @@ test("payroll sources deduplicate employee dates", () => {
   assert.equal(sources[0].source, "ATTENDANCE");
   const summary = summarizePayrollSources(22_000, 22, sources);
   assert.equal(summary.amount, 1000);
+});
+
+test("basic pay uses schedule days and prorates partial service", () => {
+  const fullMonth = calculateProratedBasicPay({ monthlySalary: 22_000, periodStart: "2026-06-01", periodEnd: "2026-06-30", serviceStart: "2020-01-01", scheduledDays: ["MONDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"] });
+  assert.equal(fullMonth.scheduledDays, 22);
+  assert.equal(fullMonth.eligibleDays, 22);
+  assert.equal(fullMonth.amount, 22_000);
+
+  const partialMonth = calculateProratedBasicPay({ monthlySalary: 22_000, periodStart: "2026-06-01", periodEnd: "2026-06-30", serviceStart: "2026-06-16", scheduledDays: [] });
+  assert.equal(partialMonth.scheduledDays, 22);
+  assert.equal(partialMonth.eligibleDays, 11);
+  assert.equal(partialMonth.amount, 11_000);
+
+  const endingMidMonth = calculateProratedBasicPay({ monthlySalary: 22_000, periodStart: "2026-06-01", periodEnd: "2026-06-30", serviceStart: "2020-01-01", serviceEnd: "2026-06-15", scheduledDays: [] });
+  assert.equal(endingMidMonth.eligibleDays, 11);
+  assert.equal(endingMidMonth.amount, 11_000);
+});
+
+test("automatic payroll adds approved extra pay and subtracts deductions", () => {
+  const overtime = calculateOvertimePay({ monthlySalary: 22_000, workingDaysPerMonth: 22, standardWorkHoursPerDay: 8, overtimeMultiplier: 1.25, hours: 2 });
+  assert.equal(overtime.hourlyRate, 125);
+  assert.equal(overtime.amount, 312.5);
+  assert.equal(calculateOverloadPay(3.5, 100), 350);
+  assert.deepEqual(calculatePayrollTotals({ basicPay: 22_000, overtimePay: 312.5, overloadPay: 350, deductions: 1_000 }), { grossPay: 22_662.5, netPay: 21_662.5 });
+  assert.deepEqual(calculatePayrollTotals({ basicPay: 22_000, overtimePay: 0, overloadPay: 0, deductions: 0 }), { grossPay: 22_000, netPay: 22_000 });
 });
 
 test("overtime and overload calculations are stable", () => {

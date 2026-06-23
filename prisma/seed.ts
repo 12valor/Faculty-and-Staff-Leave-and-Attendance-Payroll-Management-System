@@ -70,6 +70,7 @@ async function seedSettings() {
     ["standardWorkHoursPerDay", "8", "number", "Standard working hours in one day."],
     ["lateGraceMinutes", "0", "number", "Grace period before late minutes are counted."],
     ["regularTeachingLoadHours", "18", "number", "Regular weekly faculty teaching load."],
+    ["overtimeMultiplier", "1.25", "number", "Multiplier applied to the calculated hourly rate for approved overtime."],
   ] as const;
 
   for (const [key, value, valueType, description] of settings) {

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { computeWeeklyOverload, overtimeMinutesToHours } from "@/lib/calculations/overtime-overload";
+import { calculateOverloadPay, calculateOvertimePay } from "@/lib/calculations/payroll";
 import { createAuditLog } from "@/lib/audit";
 import { requireCurrentAdmin } from "@/lib/auth/current-admin";
 import { weekBounds } from "@/lib/dates";
@@ -25,13 +26,15 @@ export async function generateOvertimeAction(startDate: string, endDate: string)
 export async function decideOvertimeAction(id: string, status: "APPROVED" | "REJECTED", remarks?: string) {
   const admin = await requireCurrentAdmin();
   try {
+    const rules = await getPayrollRules();
     await getPrisma().$transaction(async (tx) => {
-      const record = await tx.overtimeRecord.findUniqueOrThrow({ where: { id } });
+      const record = await tx.overtimeRecord.findUniqueOrThrow({ where: { id }, include: { employee: true } });
       if (record.status !== "PENDING") throw new Error("Only pending overtime can be decided.");
-      await tx.overtimeRecord.update({ where: { id }, data: { status, remarks: remarks || null, decidedById: admin.id, decidedAt: new Date() } });
+      const amount = status === "APPROVED" ? calculateOvertimePay({ monthlySalary: Number(record.employee.monthlySalary), workingDaysPerMonth: rules.workingDaysPerMonth, standardWorkHoursPerDay: rules.standardWorkHoursPerDay, overtimeMultiplier: rules.overtimeMultiplier, hours: Number(record.hours) }).amount : 0;
+      await tx.overtimeRecord.update({ where: { id }, data: { status, amount, remarks: remarks || null, decidedById: admin.id, decidedAt: new Date() } });
       await createAuditLog({ adminId: admin.id, action: `OVERTIME_${status}`, entityType: "OVERTIME_RECORD", entityId: id, summary: `Overtime record was ${status.toLowerCase()}.`, metadata: { remarks } }, tx);
     });
-    revalidatePath("/overtime-overload"); return { ok: true };
+    revalidatePath("/overtime-overload"); revalidatePath("/payroll"); return { ok: true };
   } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to update overtime." }; }
 }
 
@@ -53,12 +56,15 @@ export async function generateOverloadAction(selectedDate: string) {
 export async function decideOverloadAction(id: string, status: "APPROVED" | "REJECTED", remarks?: string) {
   const admin = await requireCurrentAdmin();
   try {
+    const rules = await getPayrollRules();
+    if (status === "APPROVED" && rules.facultyOverloadHourlyRate === null) throw new Error("Set the faculty overload hourly rate in Settings before approving overload.");
     await getPrisma().$transaction(async (tx) => {
       const record = await tx.overloadRecord.findUniqueOrThrow({ where: { id } });
       if (record.status !== "PENDING") throw new Error("Only pending overload can be decided.");
-      await tx.overloadRecord.update({ where: { id }, data: { status, remarks: remarks || null, decidedById: admin.id, decidedAt: new Date() } });
+      const amount = status === "APPROVED" ? calculateOverloadPay(Number(record.overloadHours), rules.facultyOverloadHourlyRate!) : 0;
+      await tx.overloadRecord.update({ where: { id }, data: { status, amount, remarks: remarks || null, decidedById: admin.id, decidedAt: new Date() } });
       await createAuditLog({ adminId: admin.id, action: `OVERLOAD_${status}`, entityType: "OVERLOAD_RECORD", entityId: id, summary: `Overload record was ${status.toLowerCase()}.`, metadata: { remarks } }, tx);
     });
-    revalidatePath("/overtime-overload"); return { ok: true };
+    revalidatePath("/overtime-overload"); revalidatePath("/payroll"); return { ok: true };
   } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Unable to update overload." }; }
 }

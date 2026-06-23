@@ -62,18 +62,30 @@ const rulesSchema = z.object({
   standardWorkHoursPerDay: z.coerce.number().positive().max(24),
   lateGraceMinutes: z.coerce.number().int().min(0).max(120),
   regularTeachingLoadHours: z.coerce.number().min(0).max(80),
+  overtimeMultiplier: z.coerce.number().positive().max(10),
+  facultyOverloadHourlyRate: z.preprocess(
+    (value) => value === "" ? null : value,
+    z.coerce.number().positive().max(1_000_000).nullable(),
+  ),
 });
 
 export async function savePayrollRulesAction(formData: FormData) {
   const admin = await requireCurrentAdmin();
   const rules = rulesSchema.parse(Object.fromEntries(formData));
   for (const [key, value] of Object.entries(rules)) {
+    const settingKey = PAYROLL_SETTING_KEYS[key as keyof typeof PAYROLL_SETTING_KEYS];
+    if (value === null) {
+      await getPrisma().systemSetting.deleteMany({ where: { key: settingKey } });
+      continue;
+    }
     await getPrisma().systemSetting.upsert({
-      where: { key: PAYROLL_SETTING_KEYS[key as keyof typeof PAYROLL_SETTING_KEYS] },
+      where: { key: settingKey },
       update: { value: String(value) },
-      create: { key, value: String(value), valueType: "number" },
+      create: { key: settingKey, value: String(value), valueType: "number" },
     });
   }
   await createAuditLog({ adminId: admin.id, action: "PAYROLL_RULES_UPDATED", entityType: "SYSTEM_SETTING", summary: "Payroll rules were updated.", metadata: rules });
   revalidatePath("/settings");
+  revalidatePath("/payroll");
+  revalidatePath("/overtime-overload");
 }

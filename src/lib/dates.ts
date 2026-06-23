@@ -26,3 +26,25 @@ export function weekBounds(date: string) {
   current.setUTCDate(current.getUTCDate() + 6);
   return { start, end: current.toISOString().slice(0, 10) };
 }
+
+export function currentMonthRange(timeZone = "Asia/Manila") {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+  }).formatToParts(new Date());
+  const year = Number(parts.find((part) => part.type === "year")?.value);
+  const month = Number(parts.find((part) => part.type === "month")?.value);
+  const endDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const monthValue = String(month).padStart(2, "0");
+
+  return {
+    startDate: `${year}-${monthValue}-01`,
+    endDate: `${year}-${monthValue}-${String(endDay).padStart(2, "0")}`,
+    label: new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      month: "long",
+      year: "numeric",
+    }).format(new Date()),
+  };
+}

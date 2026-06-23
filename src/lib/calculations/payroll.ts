@@ -1,3 +1,6 @@
+import type { DayOfWeek } from "@/generated/prisma/client";
+import { getDayOfWeek, inclusiveDates } from "@/lib/dates";
+
 export type PayrollSource = {
   date: string;
   source: "ATTENDANCE" | "LEAVE_WITHOUT_PAY";
@@ -33,5 +36,72 @@ export function summarizePayrollSources(monthlySalary: number, workingDaysPerMon
     ...totals,
     dayValue: Number(totals.dayValue.toFixed(3)),
     amount: Number((dailyRate * totals.dayValue).toFixed(2)),
+  };
+}
+
+export function calculateProratedBasicPay(input: {
+  monthlySalary: number;
+  periodStart: string;
+  periodEnd: string;
+  serviceStart: string;
+  serviceEnd?: string | null;
+  scheduledDays: DayOfWeek[];
+}) {
+  const scheduledDays = new Set<DayOfWeek>(
+    input.scheduledDays.length
+      ? input.scheduledDays
+      : ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY"],
+  );
+  const periodDates = inclusiveDates(input.periodStart, input.periodEnd).filter(
+    (date) => scheduledDays.has(getDayOfWeek(date)),
+  );
+  const eligibleDates = periodDates.filter(
+    (date) =>
+      date >= input.serviceStart &&
+      (!input.serviceEnd || date <= input.serviceEnd),
+  );
+  const ratio = periodDates.length ? eligibleDates.length / periodDates.length : 0;
+
+  return {
+    scheduledDays: periodDates.length,
+    eligibleDays: eligibleDates.length,
+    ratio,
+    amount: Number((input.monthlySalary * ratio).toFixed(2)),
+  };
+}
+
+export function calculateOvertimePay(input: {
+  monthlySalary: number;
+  workingDaysPerMonth: number;
+  standardWorkHoursPerDay: number;
+  overtimeMultiplier: number;
+  hours: number;
+}) {
+  const divisor = input.workingDaysPerMonth * input.standardWorkHoursPerDay;
+  const hourlyRate = divisor > 0 ? input.monthlySalary / divisor : 0;
+  return {
+    hourlyRate: Number(hourlyRate.toFixed(2)),
+    amount: Number(
+      (hourlyRate * input.overtimeMultiplier * Math.max(0, input.hours)).toFixed(2),
+    ),
+  };
+}
+
+export function calculateOverloadPay(hours: number, hourlyRate: number) {
+  return Number((Math.max(0, hours) * Math.max(0, hourlyRate)).toFixed(2));
+}
+
+export function calculatePayrollTotals(input: {
+  basicPay: number;
+  overtimePay: number;
+  overloadPay: number;
+  deductions: number;
+}) {
+  const grossPay = Number(
+    (input.basicPay + input.overtimePay + input.overloadPay).toFixed(2),
+  );
+  return {
+    grossPay,
+    netPay: Number((grossPay - input.deductions).toFixed(2)),
   };
 }

@@ -116,4 +116,22 @@
   body {
     background: #ffffff;
   }
+
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+
+  [data-payslip] {
+    max-width: none !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
 }

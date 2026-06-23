@@ -42,6 +42,9 @@ export default async function SettingsPage() {
                 <RuleInput name="standardWorkHoursPerDay" label="Standard work hours per day" value={rules.standardWorkHoursPerDay} />
                 <RuleInput name="lateGraceMinutes" label="Late grace minutes" value={rules.lateGraceMinutes} />
                 <RuleInput name="regularTeachingLoadHours" label="Regular teaching load hours" value={rules.regularTeachingLoadHours} />
+                <RuleInput name="overtimeMultiplier" label="Overtime multiplier" value={rules.overtimeMultiplier} />
+                <RuleInput name="facultyOverloadHourlyRate" label="Faculty overload rate per hour" value={rules.facultyOverloadHourlyRate ?? ""} required={false} />
+                {rules.facultyOverloadHourlyRate === null ? <p className="md:col-span-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Set the faculty overload hourly rate before viewing automatic payroll.</p> : null}
                 <div className="md:col-span-2"><Button type="submit">Save payroll rules</Button></div>
               </form>
             </CardContent>
@@ -52,8 +55,8 @@ export default async function SettingsPage() {
   );
 }
 
-function RuleInput({ name, label, value }: { name: string; label: string; value: number }) {
-  return <label className="flex flex-col gap-2 text-sm font-medium">{label}<Input name={name} type="number" step="0.01" min="0" defaultValue={value} required /></label>;
+function RuleInput({ name, label, value, required = true }: { name: string; label: string; value: number | string; required?: boolean }) {
+  return <label className="flex flex-col gap-2 text-sm font-medium">{label}<Input name={name} type="number" step="0.01" min="0" defaultValue={value} required={required} /></label>;
 }
 
 type DirectoryRow = { id: string; name: string; description: string | null; isActive: boolean };

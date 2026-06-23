@@ -7,6 +7,8 @@ export const PAYROLL_SETTING_KEYS = {
   standardWorkHoursPerDay: "standardWorkHoursPerDay",
   lateGraceMinutes: "lateGraceMinutes",
   regularTeachingLoadHours: "regularTeachingLoadHours",
+  overtimeMultiplier: "overtimeMultiplier",
+  facultyOverloadHourlyRate: "facultyOverloadHourlyRate",
 } as const;
 
 export async function getPayrollRules() {
@@ -19,5 +21,8 @@ export async function getPayrollRules() {
     standardWorkHoursPerDay: values.get(PAYROLL_SETTING_KEYS.standardWorkHoursPerDay) ?? 8,
     lateGraceMinutes: values.get(PAYROLL_SETTING_KEYS.lateGraceMinutes) ?? 0,
     regularTeachingLoadHours: values.get(PAYROLL_SETTING_KEYS.regularTeachingLoadHours) ?? 18,
+    overtimeMultiplier: values.get(PAYROLL_SETTING_KEYS.overtimeMultiplier) ?? 1.25,
+    facultyOverloadHourlyRate:
+      values.get(PAYROLL_SETTING_KEYS.facultyOverloadHourlyRate) ?? null,
   };
 }
