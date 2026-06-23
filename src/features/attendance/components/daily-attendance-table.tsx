@@ -106,25 +106,6 @@ export function DailyAttendanceTable({
     <div className="flex flex-col gap-3 rounded-xl border bg-card p-4 md:flex-row md:items-end md:justify-between">
       <label className="flex max-w-xs flex-col gap-2 text-sm font-medium">Attendance date<Input type="date" value={date} onChange={(event) => changeDate(event.target.value)} disabled={isNavigating || isSaving} /></label>
       <div className="flex flex-col gap-1 text-sm text-muted-foreground"><p>All active employees are automatically listed. Encode time in and time out, then save changes.</p><p className="text-xs">Late is computed after the fixed 15-minute grace period. Undertime applies below 6 rendered hours.</p></div>
-      <div className="flex flex-wrap gap-2">
-        <AlertDialog>
-          <AlertDialogTrigger render={<Button size="sm" variant="outline" disabled={isRemoving || isSaving || isNavigating} />}>
-            <DeleteSweepRoundedIcon data-icon="inline-start" />
-            Remove Date Records
-          </AlertDialogTrigger>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Remove attendance for {date}?</AlertDialogTitle>
-              <AlertDialogDescription>This deletes all saved attendance rows for this date so you can encode and test them again. Locked payroll attendance cannot be removed.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction variant="destructive" onClick={removeAttendance} disabled={isRemoving}>{isRemoving ? "Removing…" : "Remove Attendance"}</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-        <Button onClick={save} disabled={isSaving || isRemoving || isNavigating}><SaveRoundedIcon data-icon="inline-start" />{isSaving ? "Saving…" : "Save Changes"}</Button>
-      </div>
     </div>
     <div className="relative overflow-x-auto rounded-xl border bg-card" aria-busy={isNavigating || isSaving}>
       {isNavigating ? <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-sm font-medium">Loading attendance…</div> : null}
