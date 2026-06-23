@@ -41,6 +41,7 @@ export default async function SettingsPage() {
                 <RuleInput name="workingDaysPerMonth" label="Working days per month" value={rules.workingDaysPerMonth} />
                 <RuleInput name="standardWorkHoursPerDay" label="Standard work hours per day" value={rules.standardWorkHoursPerDay} />
                 <label className="flex flex-col gap-2 text-sm font-medium">Late grace minutes (fixed)<Input name="lateGraceMinutes" type="number" value={15} readOnly aria-readonly="true" /><span className="text-xs font-normal text-muted-foreground">Attendance always uses a 15-minute grace period.</span></label>
+                <RuleInput name="absencePenaltyAmount" label="Absence / 8-hour late penalty (₱)" value={rules.absencePenaltyAmount} />
                 <RuleInput name="regularTeachingLoadHours" label="Regular teaching load hours" value={rules.regularTeachingLoadHours} />
                 <RuleInput name="overtimeMultiplier" label="Overtime multiplier" value={rules.overtimeMultiplier} />
                 <RuleInput name="facultyOverloadHourlyRate" label="Faculty overload rate per hour" value={rules.facultyOverloadHourlyRate ?? ""} required={false} />

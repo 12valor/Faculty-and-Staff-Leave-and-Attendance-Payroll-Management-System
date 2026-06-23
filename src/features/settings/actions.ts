@@ -61,6 +61,7 @@ const rulesSchema = z.object({
   workingDaysPerMonth: z.coerce.number().positive().max(31),
   standardWorkHoursPerDay: z.coerce.number().positive().max(24),
   lateGraceMinutes: z.coerce.number().int().min(15).max(15),
+  absencePenaltyAmount: z.coerce.number().positive().max(1_000_000),
   regularTeachingLoadHours: z.coerce.number().min(0).max(80),
   overtimeMultiplier: z.coerce.number().positive().max(10),
   facultyOverloadHourlyRate: z.preprocess(
@@ -88,4 +89,5 @@ export async function savePayrollRulesAction(formData: FormData) {
   revalidatePath("/settings");
   revalidatePath("/payroll");
   revalidatePath("/overtime-overload");
+  revalidatePath("/attendance");
 }

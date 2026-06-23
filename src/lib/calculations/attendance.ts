@@ -2,6 +2,7 @@ import type { AttendanceStatus } from "@/generated/prisma/client";
 
 export type TimeConversionRow = { unit: "HOUR" | "MINUTE"; value: number; equivalentDay: number };
 export type DailySchedule = { expectedTimeIn: string; expectedTimeOut: string };
+export const LATE_PENALTY_THRESHOLD_MINUTES = 480;
 
 export function timeToMinutes(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
@@ -90,16 +91,23 @@ export function computeAttendanceDeduction(input: {
   conversionTable: TimeConversionRow[];
 }) {
   let deductionDayValue = 0;
-  if (input.approvedLeave && (input.approvedLeave.unpaidDayValue ?? 0) > 0) deductionDayValue = Math.min(1, input.approvedLeave.unpaidDayValue ?? 0);
-  else if (input.approvedLeave?.isPaid) deductionDayValue = 0;
-  else if (input.status === "ABSENT" || (input.status === "ON_LEAVE" && input.approvedLeave && !input.approvedLeave.isPaid)) deductionDayValue = 1;
-  else if (input.status === "INCOMPLETE" || input.status === "NO_SCHEDULE") deductionDayValue = 0;
-  else deductionDayValue = convertMinutesToDayValue(input.lateMinutes + input.undertimeMinutes, input.conversionTable);
-
+  let deductionAmount = 0;
+  const absencePenaltyAmount = input.absencePenaltyAmount ?? 500;
   const dailyRate = input.workingDaysPerMonth > 0 ? input.monthlySalary / input.workingDaysPerMonth : 0;
+
+  if (input.approvedLeave && (input.approvedLeave.unpaidDayValue ?? 0) > 0) {
+    deductionDayValue = Math.min(1, input.approvedLeave.unpaidDayValue ?? 0);
+    deductionAmount = dailyRate * deductionDayValue;
+  } else if (input.approvedLeave?.isPaid) {
+    deductionDayValue = 0;
+  } else if (input.status === "ABSENT") {
+    deductionDayValue = 1;
+    deductionAmount = absencePenaltyAmount;
+  }
+
   return {
     deductionDayValue,
-    deductionAmount: Number((dailyRate * deductionDayValue).toFixed(2)),
+    deductionAmount: Number(deductionAmount.toFixed(2)),
   };
 }
 
@@ -223,25 +231,25 @@ export function calculateAttendancePenaltyShared(input: {
   }
 
   let deductionDayValue = 0;
+  let deductionAmount = 0;
 
   if (approvedLeave && (approvedLeave.unpaidDayValue ?? 0) > 0) {
     deductionDayValue = Math.min(1, approvedLeave.unpaidDayValue ?? 0);
+    const dailyRate = workingDaysPerMonth > 0 ? monthlySalary / workingDaysPerMonth : 0;
+    deductionAmount = dailyRate * deductionDayValue;
   } else if (approvedLeave?.isPaid) {
     deductionDayValue = 0;
-  } else if (status === "ABSENT" || (status === "ON_LEAVE" && approvedLeave && !approvedLeave.isPaid)) {
+  } else if (status === "ABSENT") {
     deductionDayValue = 1;
-  } else if (status === "INCOMPLETE" || status === "NO_SCHEDULE") {
-    deductionDayValue = 0;
-  } else {
-    const currCumDayValue = convertMinutesToDayValue(accumulatedLateMinutes, scheduledDailyHours, conversionTable);
-    const prevCumDayValue = convertMinutesToDayValue(priorLateMinutes, scheduledDailyHours, conversionTable);
-    const lateDeductionDayValue = Math.max(0, currCumDayValue - prevCumDayValue);
-    const undertimeDayValue = convertMinutesToDayValue(undertimeMinutes, scheduledDailyHours, conversionTable);
-    deductionDayValue = Number((lateDeductionDayValue + undertimeDayValue).toFixed(3));
+    deductionAmount = absencePenaltyAmount;
+  } else if (status !== "INCOMPLETE" && status !== "NO_SCHEDULE") {
+    const currentUnits = Math.floor(accumulatedLateMinutes / LATE_PENALTY_THRESHOLD_MINUTES);
+    const previousUnits = Math.floor(priorLateMinutes / LATE_PENALTY_THRESHOLD_MINUTES);
+    deductionDayValue = Math.max(0, currentUnits - previousUnits);
+    deductionAmount = deductionDayValue * absencePenaltyAmount;
   }
 
-  const dailyRate = workingDaysPerMonth > 0 ? monthlySalary / workingDaysPerMonth : 0;
-  const deductionAmount = Number((dailyRate * deductionDayValue).toFixed(2));
+  deductionAmount = Number(deductionAmount.toFixed(2));
 
   return {
     renderedMinutes,

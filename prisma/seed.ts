@@ -69,6 +69,7 @@ async function seedSettings() {
     ["workingDaysPerMonth", "22", "number", "Working days used for monthly salary calculations."],
     ["standardWorkHoursPerDay", "8", "number", "Standard working hours in one day."],
     ["lateGraceMinutes", "15", "number", "Fixed grace period before late minutes are counted."],
+    ["absencePenaltyAmount", "500", "number", "Fixed penalty for each absence or completed eight hours of cumulative lateness."],
     ["regularTeachingLoadHours", "18", "number", "Regular weekly faculty teaching load."],
     ["overtimeMultiplier", "1.25", "number", "Multiplier applied to the calculated hourly rate for approved overtime."],
   ] as const;
