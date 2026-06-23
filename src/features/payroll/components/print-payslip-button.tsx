@@ -2,7 +2,7 @@
 
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 import PrintRoundedIcon from "@mui/icons-material/PrintRounded";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import type { LivePayrollResult } from "@/features/payroll/lib/live-payroll";
 import { createWorkbook } from "@/lib/export/excel";
 
@@ -73,14 +73,14 @@ export function PrintPayslipButton({ payroll }: { payroll: LivePayrollResult }) 
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Button type="button" variant="outline" onClick={exportExcel}>
+      <button type="button" className={buttonVariants({ variant: "outline" })} onClick={exportExcel}>
         <DownloadRoundedIcon data-icon="inline-start" />
         Export Excel
-      </Button>
-      <Button type="button" onClick={() => window.print()}>
+      </button>
+      <button type="button" className={buttonVariants({ variant: "default" })} onClick={() => window.print()}>
         <PrintRoundedIcon data-icon="inline-start" />
         Print Payslip
-      </Button>
+      </button>
     </div>
   );
 }
