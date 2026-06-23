@@ -66,10 +66,14 @@ export function computeAttendanceStatus(input: {
   schedule?: DailySchedule | null;
   graceMinutes: number;
   approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
+  isBefore8AM?: boolean;
 }): AttendanceStatus {
   if (!input.schedule) return "NO_SCHEDULE";
   if (input.approvedLeave) return "ON_LEAVE";
-  if (!input.timeIn && !input.timeOut) return "ABSENT";
+  if (!input.timeIn && !input.timeOut) {
+    if (input.isBefore8AM) return "INCOMPLETE";
+    return "ABSENT";
+  }
   if (!input.timeIn || !input.timeOut) return "INCOMPLETE";
   const renderedMinutes = getRenderedMinutes(input.timeIn, input.timeOut);
   if (renderedMinutes <= 0) return "INCOMPLETE";
@@ -162,6 +166,31 @@ export function isFutureAttendanceDate(dateStr: string, timezone = "Asia/Manila"
   return dateStr > manilaToday;
 }
 
+export function isBefore8AM(dateStr: string, timezone = "Asia/Manila") {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  const hour = parts.find((part) => part.type === "hour")?.value;
+
+  const manilaToday = `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
+  if (dateStr > manilaToday) {
+    return true;
+  }
+  if (dateStr < manilaToday) {
+    return false;
+  }
+  return Number(hour) < 8;
+}
+
 export function calculateAttendancePenaltyShared(input: {
   employeeType: string;
   monthlySalary: number;
@@ -175,6 +204,7 @@ export function calculateAttendancePenaltyShared(input: {
   conversionTable: TimeConversionRow[];
   approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
   isCurrentDayPast5PM: boolean;
+  isBefore8AM?: boolean;
   absencePenaltyAmount?: number;
 }) {
   const {
@@ -188,6 +218,7 @@ export function calculateAttendancePenaltyShared(input: {
     priorLateMinutes,
     approvedLeave,
     isCurrentDayPast5PM,
+    isBefore8AM,
     absencePenaltyAmount = 500,
   } = input;
 
@@ -217,6 +248,7 @@ export function calculateAttendancePenaltyShared(input: {
     schedule,
     graceMinutes: 15,
     approvedLeave,
+    isBefore8AM,
   });
   const status = (statusOverride || computedStatus) as AttendanceStatus;
 

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { AttendanceStatus } from "@/generated/prisma/client";
-import { calculateAttendancePenaltyShared, isPast5PM } from "@/lib/calculations/attendance";
+import { calculateAttendancePenaltyShared, isPast5PM, isBefore8AM } from "@/lib/calculations/attendance";
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 import { getEmployeeScheduleForDate } from "@/features/schedules/lib/resolve-schedule";
@@ -108,6 +108,7 @@ export async function calculateAttendance(input: {
     conversionTable,
     approvedLeave,
     isCurrentDayPast5PM: isPast5PM(input.date),
+    isBefore8AM: isBefore8AM(input.date),
     absencePenaltyAmount: rules.absencePenaltyAmount,
   });
 

@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { removeAttendanceForDateAction, saveDailyAttendanceAction } from "@/features/attendance/actions";
 import type { AttendanceStatus } from "@/generated/prisma/client";
-import { calculateAttendancePenaltyShared, isPast5PM, isFutureAttendanceDate } from "@/lib/calculations/attendance";
+import { calculateAttendancePenaltyShared, isPast5PM, isFutureAttendanceDate, isBefore8AM } from "@/lib/calculations/attendance";
 
 export type DailyAttendanceEmployee = {
   employeeId: string;
@@ -133,6 +133,7 @@ export function DailyAttendanceTable({
       conversionTable: conversions,
       approvedLeave: row.approvedLeave ? { isPaid: true } : null,
       isCurrentDayPast5PM: isPast5PM(date),
+      isBefore8AM: isBefore8AM(date),
       absencePenaltyAmount: row.absencePenaltyAmount,
     });
     return {
