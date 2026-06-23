@@ -115,6 +115,8 @@
 
   body {
     background: #ffffff;
+    min-height: auto !important;
+    height: auto !important;
   }
 
   @page {
@@ -125,6 +127,8 @@
   main {
     max-width: none !important;
     padding: 0 !important;
+    min-height: auto !important;
+    height: auto !important;
   }
 
   [data-payslip] {
@@ -133,5 +137,8 @@
     border-radius: 0 !important;
     padding: 0 !important;
     box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin: 0 !important;
   }
 }
