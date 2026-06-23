@@ -30,7 +30,7 @@ export type WorkRow = WorkScheduleValues & { scheduleGroupId: string; employeeLa
 export type FacultyRow = FacultyScheduleValues & { scheduleGroupId: string; employeeLabel: string; totalTeachingHours: number; effectiveTo: string | null; isActive: boolean };
 type ScheduleActionResult = { ok: boolean; error?: string };
 
-export function ScheduleManager({ employees, workSchedules, facultySchedules, summaries }: { employees: EmployeeOption[]; workSchedules: WorkRow[]; facultySchedules: FacultyRow[]; summaries: Array<{ employeeLabel: string; workDays: number; teachingHours: number }> }) {
+export function ScheduleManager({ employees, workSchedules, facultySchedules, summaries }: { employees: EmployeeOption[]; workSchedules: WorkRow[]; facultySchedules: FacultyRow[]; summaries: Array<{ employeeLabel: string; workDays: number; totalHours: number; hoursLabel: string }> }) {
   const router = useRouter();
   const today = todayInTimeZone();
   const [workOpen, setWorkOpen] = useState(false);
@@ -58,7 +58,7 @@ export function ScheduleManager({ employees, workSchedules, facultySchedules, su
   async function archive(kind: "work" | "faculty", groupId: string) { await runScheduleAction(() => archiveScheduleAction(kind, groupId), "Schedule ended without removing its history."); }
 
   return <>
-    {summaries.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{summaries.map((summary) => <div key={summary.employeeLabel} className="rounded-xl border bg-card p-4"><p className="font-medium">{summary.employeeLabel}</p><div className="mt-3 flex gap-2"><Badge variant="secondary">{summary.workDays} working days</Badge><Badge variant="outline">{summary.teachingHours.toFixed(2)} teaching hours</Badge></div></div>)}</div> : null}
+    {summaries.length ? <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{summaries.map((summary) => <div key={summary.employeeLabel} className="rounded-xl border bg-card p-4"><p className="font-medium">{summary.employeeLabel}</p><div className="mt-3 flex gap-2"><Badge variant="secondary">{summary.workDays} working days</Badge><Badge variant="outline">{summary.totalHours.toFixed(2)} {summary.hoursLabel}</Badge></div></div>)}</div> : null}
     <Tabs defaultValue="work">
       <TabsList><TabsTrigger value="work">Staff Work Schedules</TabsTrigger><TabsTrigger value="faculty">Faculty Daily Schedules</TabsTrigger></TabsList>
       <TabsContent value="work" className="mt-4 flex flex-col gap-4">
