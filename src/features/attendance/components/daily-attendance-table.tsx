@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { removeAttendanceForDateAction, saveDailyAttendanceAction } from "@/features/attendance/actions";
 import type { AttendanceStatus } from "@/generated/prisma/client";
-import { computeAttendanceStatus, getLateMinutes, getRenderedMinutes } from "@/lib/calculations/attendance";
+import { calculateAttendancePenaltyShared, isPast5PM } from "@/lib/calculations/attendance";
 
 export type DailyAttendanceEmployee = {
   employeeId: string;
@@ -30,9 +30,21 @@ export type DailyAttendanceEmployee = {
   remarks: string;
   storedStatus: AttendanceStatus | null;
   isStatusOverridden: boolean;
+  priorLateMinutes: number;
+  scheduledDailyHours: number;
+  monthlySalary: number;
+  workingDaysPerMonth: number;
 };
 
-export function DailyAttendanceTable({ date, employees }: { date: string; employees: DailyAttendanceEmployee[] }) {
+export function DailyAttendanceTable({
+  date,
+  employees,
+  conversions,
+}: {
+  date: string;
+  employees: DailyAttendanceEmployee[];
+  conversions: Array<{ unit: "HOUR" | "MINUTE"; value: number; equivalentDay: number }>;
+}) {
   const router = useRouter();
   const [isNavigating, startNavigation] = useTransition();
   const [rows, setRows] = useState(() => employees.map((row) => ({ ...row })));
@@ -110,21 +122,32 @@ export function DailyAttendanceTable({ date, employees }: { date: string; employ
     </div>
     <div className="relative overflow-x-auto rounded-xl border bg-card" aria-busy={isNavigating || isSaving}>
       {isNavigating ? <div className="absolute inset-0 flex items-center justify-center bg-background/70 text-sm font-medium">Loading attendance…</div> : null}
-      <Table><TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Type / Assignment</TableHead><TableHead>Schedule</TableHead><TableHead>Time In</TableHead><TableHead>Time Out</TableHead><TableHead>Total Hours</TableHead><TableHead>Status</TableHead><TableHead>Remarks</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => {
+      <Table><TableHeader><TableRow><TableHead>Employee</TableHead><TableHead>Type / Assignment</TableHead><TableHead>Schedule</TableHead><TableHead>Time In</TableHead><TableHead>Time Out</TableHead><TableHead>Late</TableHead><TableHead>Accum. Late</TableHead><TableHead className="text-right">Deduction</TableHead><TableHead>Status</TableHead><TableHead>Overtime/Overload</TableHead><TableHead>Remarks</TableHead></TableRow></TableHeader><TableBody>{rows.map((row) => {
         const calculation = calculateRow(row);
         const disabled = !row.schedule || row.approvedLeave;
-        return <TableRow key={row.employeeId}><TableCell className="min-w-52"><p className="font-medium">{row.employeeName}</p><p className="text-xs text-muted-foreground">{row.employeeNumber}</p></TableCell><TableCell className="min-w-52"><p>{formatLabel(row.employeeType)}</p><p className="text-xs text-muted-foreground">{row.department} · {row.position}</p></TableCell><TableCell className="min-w-40">{row.schedule ? <><p className="font-mono text-xs">{row.schedule.expectedTimeIn}–{row.schedule.expectedTimeOut}</p><Badge variant="outline">{formatLabel(row.schedule.source)}</Badge></> : <Badge variant="outline">No Schedule</Badge>}</TableCell><TableCell><Input type="time" className="min-w-28" value={row.timeIn} onChange={(event) => updateRow(row.employeeId, "timeIn", event.target.value)} disabled={disabled} aria-label={`Time in for ${row.employeeName}`} /></TableCell><TableCell><Input type="time" className="min-w-28" value={row.timeOut} onChange={(event) => updateRow(row.employeeId, "timeOut", event.target.value)} disabled={disabled} aria-label={`Time out for ${row.employeeName}`} /></TableCell><TableCell className="font-mono text-xs">{formatMinutes(calculation.renderedMinutes)}</TableCell><TableCell><StatusBadge status={row.isStatusOverridden && calculation.unchanged ? row.storedStatus ?? calculation.status : calculation.status} overridden={row.isStatusOverridden && calculation.unchanged} /></TableCell><TableCell><Input className="min-w-48" value={row.remarks} onChange={(event) => updateRow(row.employeeId, "remarks", event.target.value)} placeholder="Optional remarks" aria-label={`Remarks for ${row.employeeName}`} /></TableCell></TableRow>;
+        return <TableRow key={row.employeeId}><TableCell className="min-w-52"><p className="font-medium">{row.employeeName}</p><p className="text-xs text-muted-foreground">{row.employeeNumber}</p></TableCell><TableCell className="min-w-40"><p>{formatLabel(row.employeeType)}</p><p className="text-xs text-muted-foreground">{row.department} · {row.position}</p></TableCell><TableCell className="min-w-32">{row.schedule ? <><p className="font-mono text-xs">{row.schedule.expectedTimeIn}–{row.schedule.expectedTimeOut}</p><Badge variant="outline">{formatLabel(row.schedule.source)}</Badge></> : <Badge variant="outline" className="text-destructive border-destructive">No Schedule</Badge>}</TableCell><TableCell><Input type="time" className="min-w-24" value={row.timeIn} onChange={(event) => updateRow(row.employeeId, "timeIn", event.target.value)} disabled={disabled} aria-label={`Time in for ${row.employeeName}`} /></TableCell><TableCell><Input type="time" className="min-w-24" value={row.timeOut} onChange={(event) => updateRow(row.employeeId, "timeOut", event.target.value)} disabled={disabled} aria-label={`Time out for ${row.employeeName}`} /></TableCell><TableCell className="font-mono text-center">{calculation.lateMinutes > 0 ? `${calculation.lateMinutes}m` : "—"}</TableCell><TableCell className="font-mono text-center">{calculation.accumulatedLateMinutes > 0 ? `${calculation.accumulatedLateMinutes}m` : "—"}</TableCell><TableCell className="font-semibold font-mono text-right min-w-24">{calculation.deductionAmount > 0 ? `₱${calculation.deductionAmount.toFixed(2)}` : "—"}</TableCell><TableCell><StatusBadge status={row.isStatusOverridden && calculation.unchanged ? row.storedStatus ?? calculation.status : calculation.status} overridden={row.isStatusOverridden && calculation.unchanged} /></TableCell><TableCell className="min-w-36 text-center">{calculation.overtimeOverloadLabel ? <Badge variant={calculation.overtimeOverloadLabel.startsWith("Pending") ? "warning" : "success"}>{calculation.overtimeOverloadLabel}</Badge> : "—"}</TableCell><TableCell><Input className="min-w-40" value={row.remarks} onChange={(event) => updateRow(row.employeeId, "remarks", event.target.value)} placeholder="Optional remarks" aria-label={`Remarks for ${row.employeeName}`} /></TableCell></TableRow>;
       })}</TableBody></Table>
     </div>
   </div>;
 
   function calculateRow(row: DailyAttendanceEmployee) {
     const initial = initialRows.get(row.employeeId);
-    const renderedMinutes = getRenderedMinutes(row.timeIn, row.timeOut);
+    const penalty = calculateAttendancePenaltyShared({
+      employeeType: row.employeeType,
+      monthlySalary: row.monthlySalary,
+      workingDaysPerMonth: row.workingDaysPerMonth,
+      timeIn: row.timeIn || null,
+      timeOut: row.timeOut || null,
+      statusOverride: row.isStatusOverridden && initial && initial.timeIn === row.timeIn && initial.timeOut === row.timeOut ? row.storedStatus : null,
+      schedule: row.schedule,
+      priorLateMinutes: row.priorLateMinutes,
+      scheduledDailyHours: row.scheduledDailyHours,
+      conversionTable: conversions,
+      approvedLeave: row.approvedLeave ? { isPaid: true } : null,
+      isCurrentDayPast5PM: isPast5PM(date),
+    });
     return {
-      renderedMinutes,
-      status: computeAttendanceStatus({ timeIn: row.timeIn || null, timeOut: row.timeOut || null, schedule: row.schedule, graceMinutes: 15, approvedLeave: row.approvedLeave ? { isPaid: true } : null }),
-      lateMinutes: row.schedule && row.timeIn ? getLateMinutes(row.schedule.expectedTimeIn, row.timeIn, 15) : 0,
+      ...penalty,
       unchanged: Boolean(initial && initial.timeIn === row.timeIn && initial.timeOut === row.timeOut && initial.remarks === row.remarks),
     };
   }

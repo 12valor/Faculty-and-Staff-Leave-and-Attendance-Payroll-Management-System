@@ -2,7 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
-import { calculateAttendance } from "@/features/attendance/lib/calculate-attendance";
+import { calculateAttendance, getPeriodOrMonthRange } from "@/features/attendance/lib/calculate-attendance";
+import { recalculateEmployeeAttendanceForPeriod } from "@/features/attendance/lib/recalculate-payroll";
 import { attendanceEntrySchema, bulkAttendanceSchema, type AttendanceEntryValues } from "@/features/attendance/schemas/attendance-schema";
 import type { AttendanceEntryMethod, AttendanceStatus } from "@/generated/prisma/client";
 import { createAuditLog } from "@/lib/audit";
@@ -45,6 +46,9 @@ export async function saveManualAttendanceAction(values: AttendanceEntryValues) 
     if (existing && existing.id !== prepared.value.id) return { ok: false, error: "Attendance already exists for this employee and date." };
     const data = attendanceData(prepared, "ADMIN_MANUAL");
     const record = prepared.value.id ? await getPrisma().attendanceRecord.update({ where: { id: prepared.value.id }, data }) : await getPrisma().attendanceRecord.create({ data });
+    const period = await getPrisma().payrollPeriod.findFirst({ where: { startDate: { lte: record.date }, endDate: { gte: record.date } } });
+    const range = period ? { startDate: period.startDate, endDate: period.endDate } : getPeriodOrMonthRange(record.date);
+    await recalculateEmployeeAttendanceForPeriod(record.employeeId, range.startDate, range.endDate);
     await createAuditLog({ adminId: admin.id, action: prepared.value.id ? "ATTENDANCE_UPDATED" : "MANUAL_ATTENDANCE_CREATED", entityType: "ATTENDANCE_RECORD", entityId: record.id, summary: `Attendance for ${prepared.calculation.employee.employeeNumber} on ${record.date} was saved.`, metadata: { status: record.status, deductionDayValue: record.deductionDayValue.toString() } });
     revalidatePath("/attendance"); revalidatePath("/dashboard");
     return { ok: true };
@@ -102,6 +106,11 @@ export async function saveDailyAttendanceAction(date: string, rows: DailyAttenda
       create: attendanceData(item, "BULK_ENCODING"),
       update: attendanceData(item, existingMap.get(item.value.employeeId)?.entryMethod ?? "BULK_ENCODING"),
     })));
+    const period = await getPrisma().payrollPeriod.findFirst({ where: { startDate: { lte: date }, endDate: { gte: date } } });
+    const range = period ? { startDate: period.startDate, endDate: period.endDate } : getPeriodOrMonthRange(date);
+    for (const employeeId of employeeIds) {
+      await recalculateEmployeeAttendanceForPeriod(employeeId, range.startDate, range.endDate);
+    }
     await createAuditLog({ adminId: admin.id, action: "DAILY_ATTENDANCE_SAVED", entityType: "ATTENDANCE_RECORD", summary: `${scheduled.length} daily attendance row(s) were saved for ${date}.`, metadata: { date, saved: scheduled.length, skippedNoSchedule: rows.length - scheduled.length } });
     revalidatePath("/attendance"); revalidatePath("/dashboard"); revalidatePath("/reports"); revalidatePath("/payroll");
     return { ok: true, count: scheduled.length };
@@ -157,6 +166,13 @@ export async function importAttendanceAction(rows: CsvAttendanceRow[]) {
   try {
     const prepared = await Promise.all(values.map(prepare));
     await getPrisma().$transaction(prepared.map((item) => getPrisma().attendanceRecord.create({ data: attendanceData(item, "CSV_IMPORT") })));
+    const affectedEmployees = [...new Set(values.map((v) => v.employeeId))];
+    for (const employeeId of affectedEmployees) {
+      const employeeDate = values.find((v) => v.employeeId === employeeId)!.date;
+      const period = await getPrisma().payrollPeriod.findFirst({ where: { startDate: { lte: employeeDate }, endDate: { gte: employeeDate } } });
+      const range = period ? { startDate: period.startDate, endDate: period.endDate } : getPeriodOrMonthRange(employeeDate);
+      await recalculateEmployeeAttendanceForPeriod(employeeId, range.startDate, range.endDate);
+    }
     await createAuditLog({ adminId: admin.id, action: "ATTENDANCE_IMPORTED", entityType: "ATTENDANCE_RECORD", summary: `${prepared.length} attendance records were imported from CSV.`, metadata: { count: prepared.length } });
     revalidatePath("/attendance"); revalidatePath("/dashboard");
     return { ok: true, count: prepared.length };

@@ -12,6 +12,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DailyAttendanceTable, StatusBadge, type DailyAttendanceEmployee } from "@/features/attendance/components/daily-attendance-table";
 import { effectiveScheduleWhere, resolveScheduleFromRows } from "@/features/schedules/lib/resolve-schedule";
+import { getFacultyScheduledDailyHours, getPeriodOrMonthRange } from "@/features/attendance/lib/calculate-attendance";
+import { getPayrollRules } from "@/lib/settings/payroll-rules";
 import type { AttendanceEntryMethod, AttendanceStatus, EmployeeType, Prisma } from "@/generated/prisma/client";
 import { getDayOfWeek, todayInTimeZone } from "@/lib/dates";
 import { getPrisma } from "@/lib/prisma";
@@ -31,20 +33,82 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
   const to = value(params.to);
   const day = getDayOfWeek(date);
   const scheduleWhere = effectiveScheduleWhere(date, day);
-  const [dailyEmployees, employees, departments, records] = await Promise.all([
+
+  const payrollPeriod = await getPrisma().payrollPeriod.findFirst({
+    where: { startDate: { lte: date }, endDate: { gte: date } }
+  });
+  const range = payrollPeriod ? { startDate: payrollPeriod.startDate, endDate: payrollPeriod.endDate } : getPeriodOrMonthRange(date);
+
+  const [dailyEmployees, employees, departments, records, rules, conversions, dailyRecordsInPeriod] = await Promise.all([
     getPrisma().employee.findMany({ where: { employmentStatus: "ACTIVE" }, include: { department: true, position: true, workSchedules: { where: scheduleWhere }, facultySchedules: { where: scheduleWhere }, attendanceRecords: { where: { date } }, leaveAllocations: { where: { date, leaveRecord: { status: "APPROVED" } } } }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
     getPrisma().employee.findMany({ where: { employmentStatus: "ACTIVE" }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
     getPrisma().department.findMany({ where: { isActive: true }, orderBy: { name: "asc" } }),
     getPrisma().attendanceRecord.findMany({ where: { employeeId, status, entryMethod, date: from || to ? { gte: from, lte: to } : undefined, employee: { departmentId, employeeType } }, include: { employee: { include: { department: true } } }, orderBy: [{ date: "desc" }, { employee: { lastName: "asc" } }] }),
+    getPayrollRules(),
+    getPrisma().cscTimeConversion.findMany({ orderBy: [{ unit: "asc" }, { value: "asc" }] }),
+    getPrisma().attendanceRecord.findMany({
+      where: {
+        date: { gte: range.startDate, lte: range.endDate },
+        NOT: { date: date }
+      }
+    })
   ]);
+
   const dailyRows: DailyAttendanceEmployee[] = dailyEmployees.map((employee) => {
     const record = employee.attendanceRecords[0];
-    return { employeeId: employee.id, employeeName: `${employee.lastName}, ${employee.firstName}`, employeeNumber: employee.employeeNumber, employeeType: employee.employeeType, department: employee.department.name, position: employee.position.name, schedule: resolveScheduleFromRows(employee.employeeType, employee.workSchedules, employee.facultySchedules), approvedLeave: employee.leaveAllocations.length > 0, timeIn: record?.timeIn ?? "", timeOut: record?.timeOut ?? "", remarks: record?.remarks ?? "", storedStatus: record?.status ?? null, isStatusOverridden: record?.isStatusOverridden ?? false };
+
+    const priorLateMinutes = dailyRecordsInPeriod
+      .filter((r) => r.employeeId === employee.id)
+      .reduce((sum, r) => sum + r.lateMinutes, 0);
+
+    const activeFacultySchedules = employee.facultySchedules.filter(s =>
+      s.isActive &&
+      s.effectiveFrom <= range.endDate &&
+      (!s.effectiveTo || s.effectiveTo >= range.startDate)
+    );
+    const activeWorkSchedules = employee.workSchedules.filter(s =>
+      s.isActive &&
+      s.effectiveFrom <= range.endDate &&
+      (!s.effectiveTo || s.effectiveTo >= range.startDate)
+    );
+
+    let thresholdHours = 8;
+    if (employee.employeeType === "FACULTY") {
+      thresholdHours = getFacultyScheduledDailyHours(activeFacultySchedules);
+    } else if (employee.employeeType === "FACULTY_WITH_STAFF_WORK") {
+      if (activeWorkSchedules.length > 0) {
+        thresholdHours = 8;
+      } else {
+        thresholdHours = getFacultyScheduledDailyHours(activeFacultySchedules);
+      }
+    }
+
+    return {
+      employeeId: employee.id,
+      employeeName: `${employee.lastName}, ${employee.firstName}`,
+      employeeNumber: employee.employeeNumber,
+      employeeType: employee.employeeType,
+      department: employee.department.name,
+      position: employee.position.name,
+      schedule: resolveScheduleFromRows(employee.employeeType, employee.workSchedules, employee.facultySchedules),
+      approvedLeave: employee.leaveAllocations.length > 0,
+      timeIn: record?.timeIn ?? "",
+      timeOut: record?.timeOut ?? "",
+      remarks: record?.remarks ?? "",
+      storedStatus: record?.status ?? null,
+      isStatusOverridden: record?.isStatusOverridden ?? false,
+      priorLateMinutes,
+      scheduledDailyHours: thresholdHours,
+      monthlySalary: Number(employee.monthlySalary),
+      workingDaysPerMonth: rules.workingDaysPerMonth,
+    };
   });
+
+  const conversionTable = conversions.map((row) => ({ unit: row.unit as any, value: row.value, equivalentDay: Number(row.equivalentDay) }));
 
   return <section className="flex flex-col gap-6">
     <PageTitle title="Attendance" description="Encode daily attendance automatically or review the complete attendance history." actions={<><Button nativeButton={false} render={<Link href="/attendance/manual" />} variant="outline"><AddRoundedIcon data-icon="inline-start" />Manual Entry</Button><Button nativeButton={false} render={<Link href="/attendance/import" />} variant="outline"><UploadFileRoundedIcon data-icon="inline-start" />CSV Import</Button></>} />
-    <Tabs defaultValue={tab}><TabsList><TabsTrigger value="daily">Daily Encoding</TabsTrigger><TabsTrigger value="history">Attendance History</TabsTrigger></TabsList><TabsContent value="daily" className="mt-4"><DailyAttendanceTable key={date} date={date} employees={dailyRows} /></TabsContent><TabsContent value="history" className="mt-4 flex flex-col gap-4"><HistoryFilters employees={employees} departments={departments} values={{ employeeId, departmentId, employeeType, status, entryMethod, from, to }} /><HistoryTable records={records} /></TabsContent></Tabs>
+    <Tabs defaultValue={tab}><TabsList><TabsTrigger value="daily">Daily Encoding</TabsTrigger><TabsTrigger value="history">Attendance History</TabsTrigger></TabsList><TabsContent value="daily" className="mt-4"><DailyAttendanceTable key={date} date={date} employees={dailyRows} conversions={conversionTable} /></TabsContent><TabsContent value="history" className="mt-4 flex flex-col gap-4"><HistoryFilters employees={employees} departments={departments} values={{ employeeId, departmentId, employeeType, status, entryMethod, from, to }} /><HistoryTable records={records} /></TabsContent></Tabs>
   </section>;
 }
 

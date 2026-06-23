@@ -28,8 +28,26 @@ export function getRenderedMinutes(timeIn?: string | null, timeOut?: string | nu
   return Math.max(0, timeToMinutes(timeOut) - timeToMinutes(timeIn));
 }
 
-export function convertMinutesToDayValue(totalMinutes: number, table: TimeConversionRow[]) {
-  const safeMinutes = Math.min(480, Math.max(0, Math.round(totalMinutes)));
+export function convertMinutesToDayValue(
+  totalMinutes: number,
+  thresholdHoursOrTable: number | TimeConversionRow[],
+  maybeTable?: TimeConversionRow[]
+) {
+  let thresholdHours = 8;
+  let table: TimeConversionRow[];
+
+  if (Array.isArray(thresholdHoursOrTable)) {
+    table = thresholdHoursOrTable;
+  } else {
+    thresholdHours = thresholdHoursOrTable;
+    table = maybeTable ?? [];
+  }
+
+  const thresholdMinutes = thresholdHours * 60;
+  // Scale minutes to standard 8-hour day (480 minutes) equivalent
+  const scaledMinutes = (totalMinutes * 480) / thresholdMinutes;
+
+  const safeMinutes = Math.min(480, Math.max(0, Math.round(scaledMinutes)));
   const hours = Math.floor(safeMinutes / 60);
   const minutes = safeMinutes % 60;
   const hourValue = hours === 0 ? 0 : table.find((row) => row.unit === "HOUR" && row.value === hours)?.equivalentDay;
@@ -82,5 +100,159 @@ export function computeAttendanceDeduction(input: {
   return {
     deductionDayValue,
     deductionAmount: Number((dailyRate * deductionDayValue).toFixed(2)),
+  };
+}
+
+export function formatMinutesToLabel(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (h > 0 && m > 0) return `${h}h ${m}m`;
+  if (h > 0) return `${h}h`;
+  return `${m}m`;
+}
+
+export function isPast5PM(dateStr: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Manila",
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  const hour = parts.find((part) => part.type === "hour")?.value;
+
+  const manilaToday = `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
+  if (dateStr < manilaToday) {
+    return true;
+  }
+  if (dateStr > manilaToday) {
+    return false;
+  }
+  return Number(hour) >= 17;
+}
+
+export function calculateAttendancePenaltyShared(input: {
+  employeeType: string;
+  monthlySalary: number;
+  workingDaysPerMonth: number;
+  timeIn: string | null;
+  timeOut: string | null;
+  statusOverride: string | null;
+  schedule: DailySchedule | null;
+  priorLateMinutes: number;
+  scheduledDailyHours: number;
+  conversionTable: TimeConversionRow[];
+  approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
+  isCurrentDayPast5PM: boolean;
+}) {
+  const {
+    employeeType,
+    monthlySalary,
+    workingDaysPerMonth,
+    timeIn,
+    timeOut,
+    statusOverride,
+    schedule,
+    priorLateMinutes,
+    scheduledDailyHours,
+    conversionTable,
+    approvedLeave,
+    isCurrentDayPast5PM,
+  } = input;
+
+  if (!schedule) {
+    return {
+      renderedMinutes: 0,
+      lateMinutes: 0,
+      accumulatedLateMinutes: priorLateMinutes,
+      undertimeMinutes: 0,
+      computedStatus: "NO_SCHEDULE" as AttendanceStatus,
+      status: (statusOverride || "NO_SCHEDULE") as AttendanceStatus,
+      deductionDayValue: 0,
+      deductionAmount: 0,
+      overtimeMinutes: 0,
+      overtimeOverloadLabel: "",
+    };
+  }
+
+  const renderedMinutes = getRenderedMinutes(timeIn, timeOut);
+  const lateMinutes = timeIn ? getLateMinutes(schedule.expectedTimeIn, timeIn, 15) : 0;
+  const accumulatedLateMinutes = priorLateMinutes + lateMinutes;
+  const undertimeMinutes = renderedMinutes > 0 ? Math.max(0, 360 - renderedMinutes) : 0;
+
+  const computedStatus = computeAttendanceStatus({
+    timeIn,
+    timeOut,
+    schedule,
+    graceMinutes: 15,
+    approvedLeave,
+  });
+  const status = (statusOverride || computedStatus) as AttendanceStatus;
+
+  let overtimeMinutes = 0;
+  let overtimeOverloadLabel = "";
+
+  const isFaculty = employeeType === "FACULTY";
+  const isFacultyWithStaff = employeeType === "FACULTY_WITH_STAFF_WORK";
+
+  let isOverloadWork = false;
+  if (isFaculty) {
+    isOverloadWork = true;
+  } else if (isFacultyWithStaff) {
+    if ((schedule as any).source === "WORK") {
+      isOverloadWork = false;
+    } else {
+      isOverloadWork = true;
+    }
+  }
+
+  if (timeIn && !timeOut && isCurrentDayPast5PM) {
+    overtimeOverloadLabel = isOverloadWork ? "Pending Overload" : "Pending Overtime";
+  } else if (timeIn && timeOut) {
+    overtimeMinutes = getOvertimeMinutes(schedule.expectedTimeOut, timeOut);
+    if (overtimeMinutes > 0) {
+      const hoursStr = formatMinutesToLabel(overtimeMinutes);
+      overtimeOverloadLabel = isOverloadWork ? `${hoursStr} Overload` : `${hoursStr} Overtime`;
+    }
+  }
+
+  let deductionDayValue = 0;
+
+  if (approvedLeave && (approvedLeave.unpaidDayValue ?? 0) > 0) {
+    deductionDayValue = Math.min(1, approvedLeave.unpaidDayValue ?? 0);
+  } else if (approvedLeave?.isPaid) {
+    deductionDayValue = 0;
+  } else if (status === "ABSENT" || (status === "ON_LEAVE" && approvedLeave && !approvedLeave.isPaid)) {
+    deductionDayValue = 1;
+  } else if (status === "INCOMPLETE" || status === "NO_SCHEDULE") {
+    deductionDayValue = 0;
+  } else {
+    const currCumDayValue = convertMinutesToDayValue(accumulatedLateMinutes, scheduledDailyHours, conversionTable);
+    const prevCumDayValue = convertMinutesToDayValue(priorLateMinutes, scheduledDailyHours, conversionTable);
+    const lateDeductionDayValue = Math.max(0, currCumDayValue - prevCumDayValue);
+    const undertimeDayValue = convertMinutesToDayValue(undertimeMinutes, scheduledDailyHours, conversionTable);
+    deductionDayValue = Number((lateDeductionDayValue + undertimeDayValue).toFixed(3));
+  }
+
+  const dailyRate = workingDaysPerMonth > 0 ? monthlySalary / workingDaysPerMonth : 0;
+  const deductionAmount = Number((dailyRate * deductionDayValue).toFixed(2));
+
+  return {
+    renderedMinutes,
+    lateMinutes,
+    accumulatedLateMinutes,
+    undertimeMinutes,
+    computedStatus,
+    status,
+    deductionDayValue,
+    deductionAmount,
+    overtimeMinutes,
+    overtimeOverloadLabel,
   };
 }
