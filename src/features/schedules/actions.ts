@@ -1,6 +1,5 @@
 "use server";
 
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 
 import { facultyScheduleSchema, type FacultyScheduleValues, workScheduleSchema, type WorkScheduleValues } from "@/features/schedules/schemas/schedule-schema";
@@ -41,7 +40,7 @@ export async function saveWorkScheduleAction(values: WorkScheduleValues) {
       if (rowsAtStart.length) await tx.workSchedule.deleteMany({ where: { id: { in: rowsAtStart.map((row) => row.id) } } });
       const currentRows = allRows.filter((row) => row.effectiveFrom < data.effectiveFrom && (!row.effectiveTo || row.effectiveTo >= data.effectiveFrom));
       if (currentRows.length) await tx.workSchedule.updateMany({ where: { id: { in: currentRows.map((row) => row.id) } }, data: { effectiveTo: previousDate(data.effectiveFrom) } });
-      const scheduleGroupId = randomUUID();
+      const scheduleGroupId = crypto.randomUUID();
       await tx.workSchedule.createMany({ data: data.workingDays.map((dayOfWeek) => ({
         employeeId: data.employeeId,
         scheduleGroupId,
@@ -89,7 +88,7 @@ export async function saveFacultyScheduleAction(values: FacultyScheduleValues) {
       }
       const conflicts = await tx.facultySchedule.findMany({ where: { employeeId: data.employeeId, dayOfWeek: { in: data.workingDays }, isActive: true } });
       if (conflicts.some((row) => overlaps(row.effectiveFrom, row.effectiveTo, data.effectiveFrom, effectiveTo) && timeToMinutes(row.startTime) < end && timeToMinutes(row.endTime) > start)) throw new Error("This teaching schedule overlaps an existing class on one or more selected days.");
-      const scheduleGroupId = randomUUID();
+      const scheduleGroupId = crypto.randomUUID();
       await tx.facultySchedule.createMany({ data: data.workingDays.map((dayOfWeek) => ({
         employeeId: data.employeeId,
         scheduleGroupId,
