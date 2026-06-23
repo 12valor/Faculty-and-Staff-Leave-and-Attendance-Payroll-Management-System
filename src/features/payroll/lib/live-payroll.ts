@@ -39,6 +39,10 @@ export type LivePayrollResult = {
     daysPresent: number;
     paidLeaveDays: number;
     totalPaidDays: number;
+    sickUsed: number;
+    vacationUsed: number;
+    sickBalance: number;
+    vacationBalance: number;
   };
   earnings: {
     basicPay: number;
@@ -107,6 +111,7 @@ export async function buildLivePayroll(
       include: {
         department: true,
         position: true,
+        leaveBalance: true,
         workSchedules: { where: { isActive: true } },
         facultySchedules: { where: { isActive: true } },
         attendanceRecords: {
@@ -119,6 +124,7 @@ export async function buildLivePayroll(
             leaveRecord: { status: "APPROVED" },
           },
           orderBy: { date: "asc" },
+          include: { leaveRecord: true },
         },
         overtimeRecords: {
           where: {
@@ -155,8 +161,13 @@ export async function buildLivePayroll(
   }
 
   let paidLeaveDays = 0;
+  let sickUsed = 0;
+  let vacationUsed = 0;
   for (const allocation of employee.leaveAllocations) {
-    paidLeaveDays += Number(allocation.paidDayValue);
+    const paid = Number(allocation.paidDayValue);
+    paidLeaveDays += paid;
+    if (allocation.leaveRecord.leaveType === "SICK") sickUsed += paid;
+    if (allocation.leaveRecord.leaveType === "VACATION") vacationUsed += paid;
   }
 
   const totalPaidDays = daysPresent + paidLeaveDays;
@@ -295,6 +306,10 @@ export async function buildLivePayroll(
       daysPresent,
       paidLeaveDays,
       totalPaidDays,
+      sickUsed,
+      vacationUsed,
+      sickBalance: employee.leaveBalance ? Number(employee.leaveBalance.sickBalance) : 0,
+      vacationBalance: employee.leaveBalance ? Number(employee.leaveBalance.vacationBalance) : 0,
     },
     earnings: {
       basicPay: Number(computedBasicPay.toFixed(2)),
