@@ -1,4 +1,5 @@
 import AccessTimeFilledRoundedIcon from "@mui/icons-material/AccessTimeFilledRounded";
+import DirectionsRunRoundedIcon from "@mui/icons-material/DirectionsRunRounded";
 import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
 import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
@@ -35,6 +36,7 @@ type DashboardData = {
   trend: Array<{ day: string; present: number; absent: number }>;
   deductions: DeductionRow[];
   today: string;
+  lateArrivalsToday: number;
   employeesOnLeaveToday: number;
 };
 
@@ -53,10 +55,10 @@ export function DashboardOverview({ data }: { data: DashboardData }) {
       icon: EventAvailableRoundedIcon,
     },
     {
-      label: "Pending leave",
-      value: String(data.pendingLeave),
-      detail: "Applications awaiting review",
-      icon: AccessTimeFilledRoundedIcon,
+      label: "Late arrivals",
+      value: String(data.lateArrivalsToday),
+      detail: "Employees late today",
+      icon: DirectionsRunRoundedIcon,
     },
     {
       label: "On leave today",
