@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createWorkbook } from "@/lib/export/excel";
+import { downloadBlob, printPage } from "@/lib/export/browser";
 import { getReportExportRows, getReportFilename, toCsv } from "@/features/reports/lib/report-export";
 
 import {
@@ -137,7 +138,7 @@ export function ReportsDashboard({
 
   // Print & PDF logic
   const handlePrint = () => {
-    window.print();
+    printPage();
   };
 
   // CSV Exporter
@@ -152,15 +153,7 @@ export function ReportsDashboard({
     const csvContent = toCsv(headers, rows);
 
     const blob = new Blob([`\uFEFF${csvContent}`], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${filename}.csv`;
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    downloadBlob(blob, `${filename}.csv`);
   };
 
   // Excel Exporter using dynamic ExcelJS workbook helper
@@ -246,14 +239,7 @@ export function ReportsDashboard({
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `${filename}.xlsx`;
-      link.style.visibility = "hidden";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      downloadBlob(blob, `${filename}.xlsx`);
     } catch (error) {
       console.error("Excel generation failed:", error);
     }
