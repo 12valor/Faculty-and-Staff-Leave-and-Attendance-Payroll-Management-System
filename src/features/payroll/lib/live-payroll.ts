@@ -14,6 +14,7 @@ import {
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 import { resolveScheduleForDateFromAllRows } from "@/features/schedules/lib/resolve-schedule";
+import { isFutureAttendanceDate } from "@/lib/calculations/attendance";
 
 export type LivePayrollResult = {
   mode: "automatic" | "manual";
@@ -153,6 +154,7 @@ export async function buildLivePayroll(
 
   let daysPresent = 0;
   for (const record of employee.attendanceRecords) {
+    if (isFutureAttendanceDate(record.date)) continue;
     if (record.status === "NO_SCHEDULE") continue;
     if (record.status === "ABSENT" && !resolveScheduleForDateFromAllRows(employee.employeeType, record.date, employee.workSchedules, employee.facultySchedules)) continue;
     if (record.status !== "ABSENT" && record.status !== "ON_LEAVE") {
@@ -164,6 +166,7 @@ export async function buildLivePayroll(
   let sickUsed = 0;
   let vacationUsed = 0;
   for (const allocation of employee.leaveAllocations) {
+    if (isFutureAttendanceDate(allocation.date)) continue;
     const paid = Number(allocation.paidDayValue);
     paidLeaveDays += paid;
     if (allocation.leaveRecord.leaveType === "SICK") sickUsed += paid;
@@ -185,6 +188,7 @@ export async function buildLivePayroll(
   const sources: Array<PayrollSource & { description: string }> = [];
 
     for (const record of employee.attendanceRecords) {
+    if (isFutureAttendanceDate(record.date)) continue;
     if (record.status === "NO_SCHEDULE") continue;
     if (record.status === "ABSENT" && !resolveScheduleForDateFromAllRows(employee.employeeType, record.date, employee.workSchedules, employee.facultySchedules)) continue;
     const allocation = allocations.get(`${employee.id}:${record.date}`);

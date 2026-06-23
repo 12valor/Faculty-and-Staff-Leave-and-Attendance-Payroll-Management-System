@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { calculateAttendance, getPeriodOrMonthRange } from "@/features/attendance/lib/calculate-attendance";
 import { recalculateEmployeeAttendanceForPeriod } from "@/features/attendance/lib/recalculate-payroll";
+import { isFutureAttendanceDate } from "@/lib/calculations/attendance";
 import { attendanceEntrySchema, bulkAttendanceSchema, type AttendanceEntryValues } from "@/features/attendance/schemas/attendance-schema";
 import type { AttendanceEntryMethod, AttendanceStatus } from "@/generated/prisma/client";
 import { createAuditLog } from "@/lib/audit";
@@ -64,7 +65,8 @@ export async function saveBulkAttendanceAction(rows: AttendanceEntryValues[]) {
     for (const row of parsed.data.rows) { const key = `${row.employeeId}:${row.date}`; if (keys.has(key)) return { ok: false, error: "The bulk form contains duplicate employee/date rows." }; keys.add(key); }
     const existing = await getPrisma().attendanceRecord.findMany({ where: { OR: parsed.data.rows.map((row) => ({ employeeId: row.employeeId, date: row.date })) } });
     if (existing.length) return { ok: false, error: "One or more employees already have attendance for this date." };
-    const prepared = await Promise.all(parsed.data.rows.map(prepare));
+    const validRows = parsed.data.rows.filter((row) => !(isFutureAttendanceDate(row.date) && !row.timeIn && !row.timeOut));
+    const prepared = await Promise.all(validRows.map(prepare));
     await getPrisma().$transaction(prepared.map((item) => getPrisma().attendanceRecord.create({ data: attendanceData(item, "BULK_ENCODING") })));
     await createAuditLog({ adminId: admin.id, action: "BULK_ATTENDANCE_CREATED", entityType: "ATTENDANCE_RECORD", summary: `${prepared.length} attendance records were created through bulk encoding.`, metadata: { count: prepared.length, date: prepared[0]?.value.date } });
     revalidatePath("/attendance"); revalidatePath("/dashboard");
@@ -100,7 +102,7 @@ export async function saveDailyAttendanceAction(date: string, rows: DailyAttenda
         overrideReason: row.preserveOverride && current?.isStatusOverridden ? current.overrideReason ?? "Existing manual override." : "",
       });
     }));
-    const scheduled = prepared.filter((item) => item.calculation.schedule);
+    const scheduled = prepared.filter((item) => item.calculation.schedule && !(isFutureAttendanceDate(date) && !item.value.timeIn && !item.value.timeOut));
     await getPrisma().$transaction(scheduled.map((item) => getPrisma().attendanceRecord.upsert({
       where: { employeeId_date: { employeeId: item.value.employeeId, date } },
       create: attendanceData(item, "BULK_ENCODING"),

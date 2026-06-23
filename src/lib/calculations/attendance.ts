@@ -146,6 +146,22 @@ export function isPast5PM(dateStr: string) {
   return Number(hour) >= 17;
 }
 
+export function isFutureAttendanceDate(dateStr: string, timezone = "Asia/Manila") {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  const manilaToday = `${year}-${month?.padStart(2, "0")}-${day?.padStart(2, "0")}`;
+  return dateStr > manilaToday;
+}
+
 export function calculateAttendancePenaltyShared(input: {
   employeeType: string;
   monthlySalary: number;
