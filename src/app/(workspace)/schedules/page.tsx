@@ -23,11 +23,16 @@ export default async function SchedulesPage({ searchParams }: { searchParams: Se
   const today = todayInTimeZone();
   const workRows = groupWorkRows(workSchedules).filter((row) => (!day || row.workingDays.includes(day)) && current(row, today));
   const facultyRows = groupFacultyRows(facultySchedules).filter((row) => (!day || row.workingDays.includes(day)) && current(row, today));
-  const summaries = options.map((employee) => ({
-    employeeLabel: employee.label,
-    workDays: workRows.filter((row) => row.employeeId === employee.id).reduce((sum, row) => sum + row.workingDays.length, 0),
-    teachingHours: facultyRows.filter((row) => row.employeeId === employee.id).reduce((sum, row) => sum + row.totalTeachingHours * row.workingDays.length, 0),
-  })).filter((summary) => summary.workDays > 0 || summary.teachingHours > 0);
+  const summaries = options.map((employee) => {
+    const employeeWorkRows = workRows.filter((row) => row.employeeId === employee.id);
+    const employeeFacultyRows = facultyRows.filter((row) => row.employeeId === employee.id);
+    const uniqueDays = new Set([...employeeWorkRows.flatMap(row => row.workingDays), ...employeeFacultyRows.flatMap(row => row.workingDays)]);
+    return {
+      employeeLabel: employee.label,
+      workDays: uniqueDays.size,
+      teachingHours: employeeFacultyRows.reduce((sum, row) => sum + row.totalTeachingHours * row.workingDays.length, 0),
+    };
+  }).filter((summary) => summary.workDays > 0 || summary.teachingHours > 0);
   return <section className="flex flex-col gap-6"><PageTitle title="Schedules" description="Maintain effective-dated staff work patterns and faculty teaching assignments." /><AutoFilterForm className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-4"><NativeSelect name="employee" defaultValue={employeeId ?? ""} className="w-full"><NativeSelectOption value="">All employees</NativeSelectOption>{options.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.label}</NativeSelectOption>)}</NativeSelect><NativeSelect name="department" defaultValue={departmentId ?? ""} className="w-full"><NativeSelectOption value="">All departments</NativeSelectOption>{departments.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}</NativeSelect><NativeSelect name="type" defaultValue={type ?? ""} className="w-full"><NativeSelectOption value="">All types</NativeSelectOption><NativeSelectOption value="FACULTY">Faculty</NativeSelectOption><NativeSelectOption value="STAFF">Staff</NativeSelectOption><NativeSelectOption value="FACULTY_WITH_STAFF_WORK">Faculty with staff work</NativeSelectOption></NativeSelect><NativeSelect name="day" defaultValue={day ?? ""} className="w-full"><NativeSelectOption value="">All days</NativeSelectOption>{["MONDAY","TUESDAY","WEDNESDAY","THURSDAY","FRIDAY","SATURDAY","SUNDAY"].map((item) => <NativeSelectOption key={item} value={item}>{item}</NativeSelectOption>)}</NativeSelect></AutoFilterForm><ScheduleManager employees={options} workSchedules={workRows} facultySchedules={facultyRows} summaries={summaries} /></section>;
 }
 
