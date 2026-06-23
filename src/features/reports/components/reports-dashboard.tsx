@@ -85,7 +85,7 @@ export function ReportsDashboard({
 
   // Cards layout
   const summaryCards = [
-    { label: "Total Employees", value: metrics.totalEmployees, desc: "Active employees in database", icon: GroupsRoundedIcon, color: "text-blue-600 bg-blue-50" },
+    { label: "Total Employees", value: metrics.totalEmployees, desc: "Active employees in database", icon: GroupsRoundedIcon, color: "text-primary bg-secondary" },
     { label: "Present Today", value: metrics.presentToday, desc: "Recorded present today", icon: EventAvailableRoundedIcon, color: "text-green-600 bg-green-50" },
     { label: "Absent Today", value: metrics.absentToday, desc: "Recorded absent today", icon: EventBusyRoundedIcon, color: "text-red-600 bg-red-50" },
     { label: "Late Today", value: metrics.lateToday, desc: "Late arrivals today", icon: AccessTimeFilledRoundedIcon, color: "text-amber-600 bg-amber-50" },
