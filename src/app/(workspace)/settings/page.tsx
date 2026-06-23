@@ -28,10 +28,10 @@ export default async function SettingsPage() {
           <TabsTrigger value="payroll">Payroll Rules</TabsTrigger>
         </TabsList>
         <TabsContent value="departments" className="mt-4">
-          <DirectoryCard title="Departments" description="Units used to classify employee records." rows={departments} saveAction={saveDepartmentAction} toggleAction={toggleDepartmentAction} />
+          <DirectoryCard title="Departments" description="Units used to classify employee records." rows={departments} kind="department" />
         </TabsContent>
         <TabsContent value="positions" className="mt-4">
-          <DirectoryCard title="Positions" description="Institutional job titles assigned to employees." rows={positions} saveAction={savePositionAction} toggleAction={togglePositionAction} />
+          <DirectoryCard title="Positions" description="Institutional job titles assigned to employees." rows={positions} kind="position" />
         </TabsContent>
         <TabsContent value="payroll" className="mt-4">
           <Card>
@@ -61,7 +61,9 @@ function RuleInput({ name, label, value, required = true }: { name: string; labe
 }
 
 type DirectoryRow = { id: string; name: string; description: string | null; isActive: boolean };
-function DirectoryCard({ title, description, rows, saveAction, toggleAction }: { title: string; description: string; rows: DirectoryRow[]; saveAction: (formData: FormData) => Promise<void>; toggleAction: (formData: FormData) => Promise<void> }) {
+function DirectoryCard({ title, description, rows, kind }: { title: string; description: string; rows: DirectoryRow[]; kind: "department" | "position" }) {
+  const saveAction = kind === "department" ? saveDepartmentAction : savePositionAction;
+  const toggleAction = kind === "department" ? toggleDepartmentAction : togglePositionAction;
   return (
     <Card>
       <CardHeader><CardTitle>{title}</CardTitle><CardDescription>{description}</CardDescription></CardHeader>

@@ -208,8 +208,6 @@ export async function buildLivePayroll(
       continue;
     }
 
-    if (record.status === "ABSENT") continue;
-
     const dayValue = Number(record.deductionDayValue);
     if (dayValue <= 0 && record.lateMinutes <= 0 && record.undertimeMinutes <= 0) continue;
     sources.push({
