@@ -83,14 +83,18 @@ export function DailyAttendanceTable({
 
   function removeAttendance() {
     startRemoving(async () => {
-      const result = await removeAttendanceForDateAction(date);
-      if (!result.ok) {
-        toast.error(result.error);
-        return;
+      try {
+        const result = await removeAttendanceForDateAction(date);
+        if (!result.ok) {
+          toast.error(result.error);
+          return;
+        }
+        setRows((current) => current.map((row) => ({ ...row, timeIn: "", timeOut: "", remarks: "", storedStatus: null, isStatusOverridden: false })));
+        toast.success(`${result.count} attendance row(s) removed. You can encode the date again.`);
+        router.refresh();
+      } catch {
+        toast.error("Unable to remove attendance. Refresh the page and try again.");
       }
-      setRows((current) => current.map((row) => ({ ...row, timeIn: "", timeOut: "", remarks: "", storedStatus: null, isStatusOverridden: false })));
-      toast.success(`${result.count} attendance row(s) removed. You can encode the date again.`);
-      router.refresh();
     });
   }
 

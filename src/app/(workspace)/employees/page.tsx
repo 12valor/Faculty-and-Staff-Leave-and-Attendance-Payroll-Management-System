@@ -1,5 +1,5 @@
+import { AutoFilterForm } from "@/components/auto-filter-form";
 import { PageTitle } from "@/components/page-title";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { EmployeeManager, type EmployeeRow } from "@/features/employees/components/employee-manager";
@@ -55,14 +55,13 @@ export default async function EmployeesPage({ searchParams }: { searchParams: Se
   return (
     <section className="flex flex-col gap-6">
       <PageTitle title="Employees" description="Create, maintain, search, and archive faculty and staff records." />
-      <form className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-6">
+      <AutoFilterForm className="grid gap-3 rounded-xl border bg-card p-4 md:grid-cols-6">
         <Input name="search" defaultValue={search} placeholder="Search name or employee no." className="md:col-span-2" />
         <NativeSelect name="type" defaultValue={employeeType ?? ""} className="w-full"><NativeSelectOption value="">All types</NativeSelectOption><NativeSelectOption value="FACULTY">Faculty</NativeSelectOption><NativeSelectOption value="STAFF">Staff</NativeSelectOption><NativeSelectOption value="FACULTY_WITH_STAFF_WORK">Faculty with staff work</NativeSelectOption></NativeSelect>
         <NativeSelect name="department" defaultValue={departmentId ?? ""} className="w-full"><NativeSelectOption value="">All departments</NativeSelectOption>{departments.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}</NativeSelect>
         <NativeSelect name="position" defaultValue={positionId ?? ""} className="w-full"><NativeSelectOption value="">All positions</NativeSelectOption>{positions.map((item) => <NativeSelectOption key={item.id} value={item.id}>{item.name}</NativeSelectOption>)}</NativeSelect>
         <NativeSelect name="status" defaultValue={status ?? ""} className="w-full"><NativeSelectOption value="">All statuses</NativeSelectOption><NativeSelectOption value="ACTIVE">Active</NativeSelectOption><NativeSelectOption value="INACTIVE">Inactive</NativeSelectOption><NativeSelectOption value="ARCHIVED">Archived</NativeSelectOption></NativeSelect>
-        <Button type="submit" className="md:col-start-6">Apply filters</Button>
-      </form>
+      </AutoFilterForm>
       <EmployeeManager employees={rows} departments={departments.map(({ id, name }) => ({ id, name }))} positions={positions.map(({ id, name }) => ({ id, name }))} />
     </section>
   );
