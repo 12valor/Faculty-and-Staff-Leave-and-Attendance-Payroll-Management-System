@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
@@ -15,7 +15,7 @@ import PictureAsPdfRoundedIcon from "@mui/icons-material/PictureAsPdfRounded";
 import TableChartRoundedIcon from "@mui/icons-material/TableChartRounded";
 import LoopRoundedIcon from "@mui/icons-material/LoopRounded";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
@@ -139,7 +139,7 @@ export function ReportsDashboard({
 
   // CSV Exporter
   const handleExportCSV = () => {
-    let filename = `Report_${currentTab}_${currentFrom}_to_${currentTo}`;
+    const filename = `Report_${currentTab}_${currentFrom}_to_${currentTo}`;
     let headers: string[] = [];
     let rows: string[][] = [];
 
@@ -204,10 +204,10 @@ export function ReportsDashboard({
 
   // Excel Exporter using dynamic ExcelJS workbook helper
   const handleExportExcel = async () => {
-    let filename = `Report_${currentTab}_${currentFrom}_to_${currentTo}`;
-    let sheetName = `${currentTab.charAt(0).toUpperCase() + currentTab.slice(1)} Report`;
+    const filename = `Report_${currentTab}_${currentFrom}_to_${currentTo}`;
+    const sheetName = `${currentTab.charAt(0).toUpperCase() + currentTab.slice(1)} Report`;
     let headers: string[] = [];
-    let rows: any[][] = [];
+    let rows: Array<Array<string | number>> = [];
 
     if (currentTab === "attendance") {
       headers = ["Employee Name", "Employee Type", "Date", "Time In", "Time Out", "Status"];

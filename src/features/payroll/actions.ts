@@ -8,6 +8,7 @@ import { createAuditLog } from "@/lib/audit";
 import { requireCurrentAdmin } from "@/lib/auth/current-admin";
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
+import { resolveScheduleForDateFromAllRows } from "@/features/schedules/lib/resolve-schedule";
 
 export type PayrollPreviewRow = {
   employeeId: string; employee: string; monthlySalary: number; dailyRate: number; totalLateMinutes: number; totalUndertimeMinutes: number; absenceDays: number; lwopDays: number; dayValue: number; amount: number;
@@ -33,7 +34,7 @@ async function buildPayrollPreview(periodId: string): Promise<{ period: { id: st
   const period = await getPrisma().payrollPeriod.findUniqueOrThrow({ where: { id: periodId } });
   const [rules, employees, attendance, allocations] = await Promise.all([
     getPayrollRules(),
-    getPrisma().employee.findMany({ where: { employmentStatus: { not: "ARCHIVED" }, serviceStartDate: { lte: period.endDate }, OR: [{ serviceEndDate: null }, { serviceEndDate: { gte: period.startDate } }] }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
+    getPrisma().employee.findMany({ where: { employmentStatus: { not: "ARCHIVED" }, serviceStartDate: { lte: period.endDate }, OR: [{ serviceEndDate: null }, { serviceEndDate: { gte: period.startDate } }] }, include: { workSchedules: true, facultySchedules: true }, orderBy: [{ lastName: "asc" }, { firstName: "asc" }] }),
     getPrisma().attendanceRecord.findMany({ where: { date: { gte: period.startDate, lte: period.endDate } } }),
     getPrisma().leaveAllocation.findMany({ where: { date: { gte: period.startDate, lte: period.endDate }, leaveRecord: { status: "APPROVED" } }, include: { leaveRecord: true } }),
   ]);
@@ -42,6 +43,8 @@ async function buildPayrollPreview(periodId: string): Promise<{ period: { id: st
     const employeeAttendance = attendance.filter((row) => row.employeeId === employee.id); const attendanceDates = new Set(employeeAttendance.map((row) => row.date));
     const sources: Array<PayrollSource & { attendanceRecordId?: string; leaveAllocationId?: string; description: string }> = [];
     for (const record of employeeAttendance) {
+      if (record.status === "NO_SCHEDULE") continue;
+      if (record.status === "ABSENT" && !resolveScheduleForDateFromAllRows(employee.employeeType, record.date, employee.workSchedules, employee.facultySchedules)) continue;
       const allocation = allocationMap.get(`${employee.id}:${record.date}`);
       if (allocation) {
         const unpaid = Number(allocation.unpaidDayValue); if (unpaid <= 0) continue;

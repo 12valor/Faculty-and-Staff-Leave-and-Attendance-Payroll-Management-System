@@ -14,8 +14,11 @@ export async function getScheduledLeaveDatesAction(employeeId: string, startDate
   if (!employeeId || !startDate || !endDate || endDate < startDate) return { ok: false, error: "Select a valid employee and date range." };
   const employee = await getPrisma().employee.findUnique({ where: { id: employeeId }, include: { workSchedules: { where: { isActive: true } }, facultySchedules: { where: { isActive: true } } } });
   if (!employee) return { ok: false, error: "Employee was not found." };
-  const scheduledDays = new Set((employee.employeeType === "FACULTY" ? employee.facultySchedules : employee.workSchedules).map((row) => row.dayOfWeek));
-  const dates = inclusiveDates(startDate, endDate).filter((date) => scheduledDays.has(getDayOfWeek(date)));
+  const dates = inclusiveDates(startDate, endDate).filter((date) => {
+    const work = employee.employeeType === "FACULTY" ? [] : employee.workSchedules;
+    const faculty = employee.employeeType === "STAFF" ? [] : employee.facultySchedules;
+    return [...work, ...faculty].some((row) => row.dayOfWeek === getDayOfWeek(date) && row.effectiveFrom <= date && (!row.effectiveTo || row.effectiveTo >= date));
+  });
   return { ok: true, dates };
 }
 

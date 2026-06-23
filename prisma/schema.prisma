@@ -19,6 +19,9 @@ enum AttendanceStatus {
   ABSENT
   ON_LEAVE
   UNDERTIME
+  INCOMPLETE
+  LATE_UNDERTIME
+  NO_SCHEDULE
 }
 
 enum AttendanceEntryMethod {
@@ -162,23 +165,28 @@ model Employee {
 model WorkSchedule {
   id              String    @id @default(cuid())
   employeeId      String
+  scheduleGroupId String
   dayOfWeek       DayOfWeek
   expectedTimeIn  String
   expectedTimeOut String
   breakMinutes    Int       @default(0)
   requiredHours   Decimal
+  effectiveFrom   String    @default("2000-01-01")
+  effectiveTo     String?
   isActive        Boolean   @default(true)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  @@unique([employeeId, dayOfWeek])
-  @@index([dayOfWeek, isActive])
+  @@index([employeeId, effectiveFrom, effectiveTo, isActive])
+  @@index([dayOfWeek, effectiveFrom, effectiveTo, isActive])
+  @@index([scheduleGroupId])
 }
 
 model FacultySchedule {
   id                 String    @id @default(cuid())
   employeeId         String
+  scheduleGroupId    String
   subjectOrClass     String
   dayOfWeek          DayOfWeek
   startTime          String
@@ -186,13 +194,16 @@ model FacultySchedule {
   totalTeachingHours Decimal
   roomOrSection      String?
   remarks            String?
+  effectiveFrom      String    @default("2000-01-01")
+  effectiveTo        String?
   isActive           Boolean   @default(true)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
   employee           Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 
-  @@index([employeeId, dayOfWeek, isActive])
-  @@index([dayOfWeek, isActive])
+  @@index([employeeId, effectiveFrom, effectiveTo, isActive])
+  @@index([dayOfWeek, effectiveFrom, effectiveTo, isActive])
+  @@index([scheduleGroupId])
 }
 
 model AttendanceRecord {
@@ -209,6 +220,7 @@ model AttendanceRecord {
   lateMinutes        Int                         @default(0)
   undertimeMinutes   Int                         @default(0)
   overtimeMinutes    Int                         @default(0)
+  renderedMinutes    Int                         @default(0)
   deductionDayValue  Decimal                     @default(0)
   deductionAmount    Decimal                     @default(0)
   remarks            String?

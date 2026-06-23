@@ -11,6 +11,7 @@ import {
 } from "@/lib/calculations/payroll";
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
+import { resolveScheduleForDateFromAllRows } from "@/features/schedules/lib/resolve-schedule";
 
 export type LivePayrollResult = {
   mode: "automatic" | "manual";
@@ -159,7 +160,9 @@ export async function buildLivePayroll(
   );
   const sources: Array<PayrollSource & { description: string }> = [];
 
-  for (const record of employee.attendanceRecords) {
+    for (const record of employee.attendanceRecords) {
+    if (record.status === "NO_SCHEDULE") continue;
+    if (record.status === "ABSENT" && !resolveScheduleForDateFromAllRows(employee.employeeType, record.date, employee.workSchedules, employee.facultySchedules)) continue;
     const allocation = allocations.get(`${employee.id}:${record.date}`);
     if (allocation) {
       const unpaid = Number(allocation.unpaidDayValue);

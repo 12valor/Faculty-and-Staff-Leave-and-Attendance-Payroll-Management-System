@@ -3,7 +3,7 @@
 import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 
 // Helper to format currency
 const formatCurrency = (amount: number) => {
@@ -59,10 +59,13 @@ export function AttendanceReportTable({ data }: { data: AttendanceReportRow[] })
         return "success";
       case "LATE":
       case "UNDERTIME":
+      case "LATE_UNDERTIME":
+      case "INCOMPLETE":
         return "warning";
       case "ABSENT":
         return "destructive";
       case "ON_LEAVE":
+      case "NO_SCHEDULE":
         return "secondary";
       default:
         return "outline";

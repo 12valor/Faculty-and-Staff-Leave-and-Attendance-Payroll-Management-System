@@ -24,6 +24,7 @@ function attendanceData(prepared: Awaited<ReturnType<typeof prepare>>, entryMeth
     computedStatus: calculation.computedStatus, status: calculation.status, isStatusOverridden: calculation.isStatusOverridden,
     overrideReason: calculation.isStatusOverridden ? value.overrideReason || null : null, lateMinutes: calculation.lateMinutes,
     undertimeMinutes: calculation.undertimeMinutes, overtimeMinutes: calculation.overtimeMinutes,
+    renderedMinutes: calculation.renderedMinutes,
     deductionDayValue: calculation.deductionDayValue, deductionAmount: calculation.deductionAmount, remarks: value.remarks || null,
   };
 }
@@ -65,6 +66,46 @@ export async function saveBulkAttendanceAction(rows: AttendanceEntryValues[]) {
     revalidatePath("/attendance"); revalidatePath("/dashboard");
     return { ok: true, count: prepared.length };
   } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Bulk attendance was not saved." }; }
+}
+
+export type DailyAttendanceRow = {
+  employeeId: string;
+  timeIn: string;
+  timeOut: string;
+  remarks: string;
+  preserveOverride?: boolean;
+};
+
+export async function saveDailyAttendanceAction(date: string, rows: DailyAttendanceRow[]) {
+  const admin = await requireCurrentAdmin();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !rows.length) return { ok: false, error: "Select a valid date with attendance rows." };
+  const employeeIds = [...new Set(rows.map((row) => row.employeeId))];
+  if (employeeIds.length !== rows.length) return { ok: false, error: "Duplicate employees were found in the daily attendance rows." };
+  try {
+    const existing = await getPrisma().attendanceRecord.findMany({ where: { date, employeeId: { in: employeeIds } } });
+    const existingMap = new Map(existing.map((record) => [record.employeeId, record]));
+    const prepared = await Promise.all(rows.map(async (row) => {
+      const current = existingMap.get(row.employeeId);
+      return prepare({
+        employeeId: row.employeeId,
+        date,
+        timeIn: row.timeIn,
+        timeOut: row.timeOut,
+        remarks: row.remarks,
+        statusOverride: row.preserveOverride && current?.isStatusOverridden ? current.status : "",
+        overrideReason: row.preserveOverride && current?.isStatusOverridden ? current.overrideReason ?? "Existing manual override." : "",
+      });
+    }));
+    const scheduled = prepared.filter((item) => item.calculation.schedule);
+    await getPrisma().$transaction(scheduled.map((item) => getPrisma().attendanceRecord.upsert({
+      where: { employeeId_date: { employeeId: item.value.employeeId, date } },
+      create: attendanceData(item, "BULK_ENCODING"),
+      update: attendanceData(item, existingMap.get(item.value.employeeId)?.entryMethod ?? "BULK_ENCODING"),
+    })));
+    await createAuditLog({ adminId: admin.id, action: "DAILY_ATTENDANCE_SAVED", entityType: "ATTENDANCE_RECORD", summary: `${scheduled.length} daily attendance row(s) were saved for ${date}.`, metadata: { date, saved: scheduled.length, skippedNoSchedule: rows.length - scheduled.length } });
+    revalidatePath("/attendance"); revalidatePath("/dashboard"); revalidatePath("/reports"); revalidatePath("/payroll");
+    return { ok: true, count: scheduled.length };
+  } catch (error) { return { ok: false, error: error instanceof Error ? error.message : "Daily attendance was not saved." }; }
 }
 
 export type CsvAttendanceRow = { employeeNumber: string; date: string; timeIn: string; timeOut: string; status: string; remarks: string };

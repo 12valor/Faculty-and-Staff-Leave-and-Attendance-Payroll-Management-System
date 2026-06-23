@@ -68,7 +68,7 @@ async function seedSettings() {
   const settings = [
     ["workingDaysPerMonth", "22", "number", "Working days used for monthly salary calculations."],
     ["standardWorkHoursPerDay", "8", "number", "Standard working hours in one day."],
-    ["lateGraceMinutes", "0", "number", "Grace period before late minutes are counted."],
+    ["lateGraceMinutes", "15", "number", "Fixed grace period before late minutes are counted."],
     ["regularTeachingLoadHours", "18", "number", "Regular weekly faculty teaching load."],
     ["overtimeMultiplier", "1.25", "number", "Multiplier applied to the calculated hourly rate for approved overtime."],
   ] as const;

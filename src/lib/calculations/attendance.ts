@@ -23,6 +23,11 @@ export function getOvertimeMinutes(scheduleTimeOut: string, actualTimeOut: strin
   return Math.max(0, timeToMinutes(actualTimeOut) - timeToMinutes(scheduleTimeOut));
 }
 
+export function getRenderedMinutes(timeIn?: string | null, timeOut?: string | null) {
+  if (!timeIn || !timeOut) return 0;
+  return Math.max(0, timeToMinutes(timeOut) - timeToMinutes(timeIn));
+}
+
 export function convertMinutesToDayValue(totalMinutes: number, table: TimeConversionRow[]) {
   const safeMinutes = Math.min(480, Math.max(0, Math.round(totalMinutes)));
   const hours = Math.floor(safeMinutes / 60);
@@ -43,11 +48,17 @@ export function computeAttendanceStatus(input: {
   graceMinutes: number;
   approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
 }): AttendanceStatus {
+  if (!input.schedule) return "NO_SCHEDULE";
   if (input.approvedLeave) return "ON_LEAVE";
-  if (!input.timeIn || !input.timeOut) return "ABSENT";
-  if (!input.schedule) return "PRESENT";
-  if (getLateMinutes(input.schedule.expectedTimeIn, input.timeIn, input.graceMinutes) > 0) return "LATE";
-  if (getUndertimeMinutes(input.schedule.expectedTimeOut, input.timeOut) > 0) return "UNDERTIME";
+  if (!input.timeIn && !input.timeOut) return "ABSENT";
+  if (!input.timeIn || !input.timeOut) return "INCOMPLETE";
+  const renderedMinutes = getRenderedMinutes(input.timeIn, input.timeOut);
+  if (renderedMinutes <= 0) return "INCOMPLETE";
+  const isLate = getLateMinutes(input.schedule.expectedTimeIn, input.timeIn, input.graceMinutes) > 0;
+  const isUndertime = renderedMinutes < 360;
+  if (isLate && isUndertime) return "LATE_UNDERTIME";
+  if (isLate) return "LATE";
+  if (isUndertime) return "UNDERTIME";
   return "PRESENT";
 }
 
@@ -64,6 +75,7 @@ export function computeAttendanceDeduction(input: {
   if (input.approvedLeave && (input.approvedLeave.unpaidDayValue ?? 0) > 0) deductionDayValue = Math.min(1, input.approvedLeave.unpaidDayValue ?? 0);
   else if (input.approvedLeave?.isPaid) deductionDayValue = 0;
   else if (input.status === "ABSENT" || (input.status === "ON_LEAVE" && input.approvedLeave && !input.approvedLeave.isPaid)) deductionDayValue = 1;
+  else if (input.status === "INCOMPLETE" || input.status === "NO_SCHEDULE") deductionDayValue = 0;
   else deductionDayValue = convertMinutesToDayValue(input.lateMinutes + input.undertimeMinutes, input.conversionTable);
 
   const dailyRate = input.workingDaysPerMonth > 0 ? input.monthlySalary / input.workingDaysPerMonth : 0;

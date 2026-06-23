@@ -60,7 +60,7 @@ export async function togglePositionAction(formData: FormData) {
 const rulesSchema = z.object({
   workingDaysPerMonth: z.coerce.number().positive().max(31),
   standardWorkHoursPerDay: z.coerce.number().positive().max(24),
-  lateGraceMinutes: z.coerce.number().int().min(0).max(120),
+  lateGraceMinutes: z.coerce.number().int().min(15).max(15),
   regularTeachingLoadHours: z.coerce.number().min(0).max(80),
   overtimeMultiplier: z.coerce.number().positive().max(10),
   facultyOverloadHourlyRate: z.preprocess(

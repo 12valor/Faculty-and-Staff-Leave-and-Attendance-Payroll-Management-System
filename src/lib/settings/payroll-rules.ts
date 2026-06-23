@@ -19,7 +19,7 @@ export async function getPayrollRules() {
   return {
     workingDaysPerMonth: values.get(PAYROLL_SETTING_KEYS.workingDaysPerMonth) ?? 22,
     standardWorkHoursPerDay: values.get(PAYROLL_SETTING_KEYS.standardWorkHoursPerDay) ?? 8,
-    lateGraceMinutes: values.get(PAYROLL_SETTING_KEYS.lateGraceMinutes) ?? 0,
+    lateGraceMinutes: 15,
     regularTeachingLoadHours: values.get(PAYROLL_SETTING_KEYS.regularTeachingLoadHours) ?? 18,
     overtimeMultiplier: values.get(PAYROLL_SETTING_KEYS.overtimeMultiplier) ?? 1.25,
     facultyOverloadHourlyRate:

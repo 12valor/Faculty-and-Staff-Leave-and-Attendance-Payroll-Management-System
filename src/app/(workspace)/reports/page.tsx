@@ -1,8 +1,9 @@
 import { getPrisma } from "@/lib/prisma";
 import type { EmployeeType } from "@/generated/prisma/client";
 import { ReportsDashboard } from "@/features/reports/components/reports-dashboard";
+import type { AttendanceReportRow, EmployeeReportRow, LeaveReportRow, PayrollReportRow } from "@/features/reports/components/report-tables";
 import { PageTitle } from "@/components/page-title";
-import AssessmentRoundedIcon from "@mui/icons-material/AssessmentRounded";
+import { resolveScheduleForDateFromAllRows } from "@/features/schedules/lib/resolve-schedule";
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -40,7 +41,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
     payrollPeriods,
   ] = await Promise.all([
     prisma.employee.count({ where: { employmentStatus: "ACTIVE" } }),
-    prisma.attendanceRecord.findMany({ where: { date: today } }),
+    prisma.attendanceRecord.findMany({ where: { date: today }, include: { employee: { include: { workSchedules: true, facultySchedules: true } } } }),
     prisma.leaveRecord.count({ where: { status: "PENDING" } }),
     prisma.leaveRecord.count({ where: { status: "APPROVED" } }),
     prisma.payrollPeriod.count(),
@@ -49,9 +50,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
     prisma.payrollPeriod.findMany({ orderBy: { startDate: "desc" } }),
   ]);
 
-  const presentToday = todayRecords.filter((row) => ["PRESENT", "LATE", "UNDERTIME"].includes(row.status)).length;
-  const absentToday = todayRecords.filter((row) => row.status === "ABSENT").length;
-  const lateToday = todayRecords.filter((row) => row.status === "LATE").length;
+  const presentToday = todayRecords.filter((row) => ["PRESENT", "LATE", "UNDERTIME", "LATE_UNDERTIME"].includes(row.status)).length;
+  const absentToday = todayRecords.filter((row) => row.status === "ABSENT" && resolveScheduleForDateFromAllRows(row.employee.employeeType, today, row.employee.workSchedules, row.employee.facultySchedules)).length;
+  const lateToday = todayRecords.filter((row) => ["LATE", "LATE_UNDERTIME"].includes(row.status)).length;
 
   const metrics = {
     totalEmployees,
@@ -70,10 +71,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
   };
 
   // 2. Fetch specific report data based on active tab
-  let attendanceData: any[] = [];
-  let leaveData: any[] = [];
-  let payrollData: any[] = [];
-  let employeeData: any[] = [];
+  let attendanceData: AttendanceReportRow[] = [];
+  let leaveData: LeaveReportRow[] = [];
+  let payrollData: PayrollReportRow[] = [];
+  let employeeData: EmployeeReportRow[] = [];
 
   if (tab === "attendance") {
     const records = await prisma.attendanceRecord.findMany({
@@ -90,6 +91,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
           include: {
             department: true,
             position: true,
+            workSchedules: true,
+            facultySchedules: true,
           },
         },
       },
@@ -106,7 +109,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Sear
       date: r.date,
       timeIn: r.timeIn,
       timeOut: r.timeOut,
-      status: r.status,
+      status: r.status === "ABSENT" && !resolveScheduleForDateFromAllRows(r.employee.employeeType, r.date, r.employee.workSchedules, r.employee.facultySchedules) ? "NO_SCHEDULE" : r.status,
       isStatusOverridden: r.isStatusOverridden,
     }));
   } else if (tab === "leave") {
