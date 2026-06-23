@@ -123,6 +123,7 @@ echo  ==========================================================================
 echo.
 echo  Opening system and database dashboard in your default browser...
 start http://localhost:3000
+timeout /t 1 >nul
 start http://localhost:5555
 echo.
 
