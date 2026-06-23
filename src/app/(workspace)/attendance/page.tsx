@@ -49,8 +49,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
     getPrisma().cscTimeConversion.findMany({ orderBy: [{ unit: "asc" }, { value: "asc" }] }),
     getPrisma().attendanceRecord.findMany({
       where: {
-        date: { gte: range.startDate, lte: range.endDate },
-        NOT: { date: date }
+        date: { gte: range.startDate, lt: date }
       }
     })
   ]);
@@ -102,6 +101,7 @@ export default async function AttendancePage({ searchParams }: { searchParams: S
       scheduledDailyHours: thresholdHours,
       monthlySalary: Number(employee.monthlySalary),
       workingDaysPerMonth: rules.workingDaysPerMonth,
+      absencePenaltyAmount: rules.absencePenaltyAmount,
     };
   });
 

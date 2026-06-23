@@ -6,7 +6,7 @@ import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 import { getEmployeeScheduleForDate } from "@/features/schedules/lib/resolve-schedule";
 
-export function getFacultyScheduledDailyHours(facultySchedules: Array<{ dayOfWeek: string; totalTeachingHours: any }>) {
+export function getFacultyScheduledDailyHours(facultySchedules: Array<{ dayOfWeek: string; totalTeachingHours: unknown }>) {
   const dayTotals = new Map<string, number>();
   for (const row of facultySchedules) {
     const hours = Number(row.totalTeachingHours);
@@ -59,8 +59,7 @@ export async function calculateAttendance(input: {
     prisma.attendanceRecord.findMany({
       where: {
         employeeId: input.employeeId,
-        date: { gte: range.startDate, lte: range.endDate },
-        NOT: { date: input.date }
+        date: { gte: range.startDate, lt: input.date }
       }
     })
   ]);
@@ -94,7 +93,7 @@ export async function calculateAttendance(input: {
 
   const approvedLeave = leaveAllocation ? { isPaid: Number(leaveAllocation.unpaidDayValue) === 0, unpaidDayValue: Number(leaveAllocation.unpaidDayValue) } : null;
 
-  const conversionTable = conversions.map((row) => ({ unit: row.unit as any, value: row.value, equivalentDay: Number(row.equivalentDay) }));
+  const conversionTable = conversions.map((row) => ({ unit: row.unit, value: row.value, equivalentDay: Number(row.equivalentDay) }));
 
   const penalty = calculateAttendancePenaltyShared({
     employeeType: employee.employeeType,
@@ -109,6 +108,7 @@ export async function calculateAttendance(input: {
     conversionTable,
     approvedLeave,
     isCurrentDayPast5PM: isPast5PM(input.date),
+    absencePenaltyAmount: rules.absencePenaltyAmount,
   });
 
   return {

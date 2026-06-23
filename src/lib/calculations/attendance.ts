@@ -1,7 +1,7 @@
 import type { AttendanceStatus } from "@/generated/prisma/client";
 
 export type TimeConversionRow = { unit: "HOUR" | "MINUTE"; value: number; equivalentDay: number };
-export type DailySchedule = { expectedTimeIn: string; expectedTimeOut: string };
+export type DailySchedule = { expectedTimeIn: string; expectedTimeOut: string; source?: string };
 export const LATE_PENALTY_THRESHOLD_MINUTES = 480;
 
 export function timeToMinutes(value: string) {
@@ -89,6 +89,7 @@ export function computeAttendanceDeduction(input: {
   undertimeMinutes: number;
   approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
   conversionTable: TimeConversionRow[];
+  absencePenaltyAmount?: number;
 }) {
   let deductionDayValue = 0;
   let deductionAmount = 0;
@@ -158,6 +159,7 @@ export function calculateAttendancePenaltyShared(input: {
   conversionTable: TimeConversionRow[];
   approvedLeave?: { isPaid: boolean; unpaidDayValue?: number } | null;
   isCurrentDayPast5PM: boolean;
+  absencePenaltyAmount?: number;
 }) {
   const {
     employeeType,
@@ -168,10 +170,9 @@ export function calculateAttendancePenaltyShared(input: {
     statusOverride,
     schedule,
     priorLateMinutes,
-    scheduledDailyHours,
-    conversionTable,
     approvedLeave,
     isCurrentDayPast5PM,
+    absencePenaltyAmount = 500,
   } = input;
 
   if (!schedule) {
@@ -213,7 +214,7 @@ export function calculateAttendancePenaltyShared(input: {
   if (isFaculty) {
     isOverloadWork = true;
   } else if (isFacultyWithStaff) {
-    if ((schedule as any).source === "WORK") {
+    if (schedule.source === "WORK") {
       isOverloadWork = false;
     } else {
       isOverloadWork = true;

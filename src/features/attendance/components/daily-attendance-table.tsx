@@ -34,6 +34,7 @@ export type DailyAttendanceEmployee = {
   scheduledDailyHours: number;
   monthlySalary: number;
   workingDaysPerMonth: number;
+  absencePenaltyAmount: number;
 };
 
 export function DailyAttendanceTable({
@@ -149,6 +150,7 @@ export function DailyAttendanceTable({
       conversionTable: conversions,
       approvedLeave: row.approvedLeave ? { isPaid: true } : null,
       isCurrentDayPast5PM: isPast5PM(date),
+      absencePenaltyAmount: row.absencePenaltyAmount,
     });
     return {
       ...penalty,
@@ -162,5 +164,4 @@ export function StatusBadge({ status, overridden = false }: { status: Attendance
   return <Badge variant={variant}>{formatLabel(status)}{overridden ? " · Override" : ""}</Badge>;
 }
 
-function formatMinutes(minutes: number) { return minutes ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : "—"; }
 function formatLabel(value: string) { return value.replaceAll("_", " ").toLowerCase().replace(/\b\w/g, (letter) => letter.toUpperCase()); }

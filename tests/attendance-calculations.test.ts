@@ -45,54 +45,49 @@ test("CSC conversion examples and deductions", () => {
   assert.equal(convertMinutesToDayValue(60, table), 0.125);
   assert.equal(convertMinutesToDayValue(90, table), 0.187);
   assert.equal(convertMinutesToDayValue(480, table), 1);
-  assert.deepEqual(computeAttendanceDeduction({ monthlySalary: 22000, workingDaysPerMonth: 22, status: "ABSENT", lateMinutes: 0, undertimeMinutes: 0, conversionTable: table }), { deductionDayValue: 1, deductionAmount: 1000 });
+  assert.deepEqual(computeAttendanceDeduction({ monthlySalary: 22000, workingDaysPerMonth: 22, status: "ABSENT", lateMinutes: 0, undertimeMinutes: 0, conversionTable: table }), { deductionDayValue: 1, deductionAmount: 500 });
   assert.deepEqual(computeAttendanceDeduction({ monthlySalary: 22000, workingDaysPerMonth: 22, status: "NO_SCHEDULE", lateMinutes: 0, undertimeMinutes: 0, conversionTable: table }), { deductionDayValue: 0, deductionAmount: 0 });
   assert.deepEqual(computeAttendanceDeduction({ monthlySalary: 22000, workingDaysPerMonth: 22, status: "ON_LEAVE", lateMinutes: 0, undertimeMinutes: 0, approvedLeave: { isPaid: true }, conversionTable: table }), { deductionDayValue: 0, deductionAmount: 0 });
 });
 
-test("cumulative late minutes and threshold deductions", () => {
-  // Faculty with 8-hour (480 minutes) scheduled day and 480 accumulated late minutes = 1 day deduction.
-  const penalty8hr = calculateAttendancePenaltyShared({
-    employeeType: "FACULTY",
-    monthlySalary: 22000,
+test("fixed absence and cumulative late threshold deductions", () => {
+  const base = {
+    employeeType: "STAFF",
+    monthlySalary: 44_000,
     workingDaysPerMonth: 22,
-    timeIn: "09:15", // 60 minutes late
     timeOut: "17:00",
     statusOverride: null,
-    schedule: { expectedTimeIn: "08:00", expectedTimeOut: "16:00" },
-    priorLateMinutes: 420, // 420 + 60 = 480 accumulated late minutes
+    schedule: { expectedTimeIn: "08:00", expectedTimeOut: "17:00" },
     scheduledDailyHours: 8,
     conversionTable: table,
-    isCurrentDayPast5PM: false
-  });
-  // Accumulated late minutes reaches 480 (8 hours), which scaled is 480 minutes -> equivalentDay should be 1.0.
-  // The cumulative day value for 480 minutes is 1.0.
-  // The cumulative day value for prior 420 minutes is 420/480 = 0.875.
-  // So marginal deduction for this day is 1.0 - 0.875 = 0.125 days.
-  assert.equal(penalty8hr.accumulatedLateMinutes, 480);
-  assert.equal(penalty8hr.deductionDayValue, 0.125); // 1.0 - 0.875 = 0.125
+    isCurrentDayPast5PM: false,
+    absencePenaltyAmount: 500,
+  };
 
-  // Faculty with 6-hour (360 minutes) scheduled day and 360 accumulated late minutes = 1 day deduction.
-  const penalty6hr = calculateAttendancePenaltyShared({
-    employeeType: "FACULTY",
-    monthlySalary: 22000,
-    workingDaysPerMonth: 22,
-    timeIn: "09:15", // 60 minutes late
-    timeOut: "17:00",
-    statusOverride: null,
-    schedule: { expectedTimeIn: "08:00", expectedTimeOut: "14:00" },
-    priorLateMinutes: 300, // 300 + 60 = 360 accumulated late minutes
-    scheduledDailyHours: 6,
-    conversionTable: table,
-    isCurrentDayPast5PM: false
-  });
-  // Accumulated late minutes reaches 360 (6 hours threshold), which scaled is 360 * 480 / 360 = 480 minutes -> 1.0 day deduction.
-  // Prior 300 minutes scaled is 300 * 480 / 360 = 400 minutes -> 400/480 = 0.833 day deduction.
-  // Marginal deduction for this day is 1.0 - 0.833 = 0.167 days.
-  assert.equal(penalty6hr.accumulatedLateMinutes, 360);
-  assert.equal(penalty6hr.deductionDayValue, 0.167);
+  const belowThreshold = calculateAttendancePenaltyShared({ ...base, timeIn: "12:42", priorLateMinutes: 0 });
+  assert.equal(belowThreshold.lateMinutes, 267);
+  assert.equal(belowThreshold.deductionDayValue, 0);
+  assert.equal(belowThreshold.deductionAmount, 0);
+
+  const firstThreshold = calculateAttendancePenaltyShared({ ...base, timeIn: "08:16", priorLateMinutes: 479 });
+  assert.equal(firstThreshold.accumulatedLateMinutes, 480);
+  assert.equal(firstThreshold.deductionDayValue, 1);
+  assert.equal(firstThreshold.deductionAmount, 500);
+
+  const secondThreshold = calculateAttendancePenaltyShared({ ...base, timeIn: "08:16", priorLateMinutes: 959 });
+  assert.equal(secondThreshold.accumulatedLateMinutes, 960);
+  assert.equal(secondThreshold.deductionDayValue, 1);
+  assert.equal(secondThreshold.deductionAmount, 500);
+
+  const undertimeOnly = calculateAttendancePenaltyShared({ ...base, timeIn: "08:00", timeOut: "13:00", priorLateMinutes: 0 });
+  assert.equal(undertimeOnly.undertimeMinutes, 60);
+  assert.equal(undertimeOnly.deductionAmount, 0);
+
+  const absence = calculateAttendancePenaltyShared({ ...base, timeIn: null, timeOut: null, priorLateMinutes: 0 });
+  assert.equal(absence.status, "ABSENT");
+  assert.equal(absence.deductionDayValue, 1);
+  assert.equal(absence.deductionAmount, 500);
 });
-
 test("pending and final overtime/overload triggers", () => {
   // Employee timed in but no timeout after 5:00 PM = pending overtime/overload.
   const pendingStaff = calculateAttendancePenaltyShared({

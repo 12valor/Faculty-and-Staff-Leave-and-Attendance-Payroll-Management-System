@@ -1,7 +1,6 @@
 import "server-only";
 
 import { calculateAttendancePenaltyShared, isPast5PM } from "@/lib/calculations/attendance";
-import { getDayOfWeek } from "@/lib/dates";
 import { getPrisma } from "@/lib/prisma";
 import { getPayrollRules } from "@/lib/settings/payroll-rules";
 import { resolveScheduleForDateFromAllRows } from "@/features/schedules/lib/resolve-schedule";
@@ -53,7 +52,7 @@ export async function recalculateEmployeeAttendanceForPeriod(employeeId: string,
   ]);
 
   const leaveMap = new Map(leaveAllocations.map(la => [la.date, la]));
-  const conversionTable = conversions.map(row => ({ unit: row.unit as any, value: row.value, equivalentDay: Number(row.equivalentDay) }));
+  const conversionTable = conversions.map(row => ({ unit: row.unit, value: row.value, equivalentDay: Number(row.equivalentDay) }));
 
   let priorLateMinutes = 0;
 
@@ -75,6 +74,7 @@ export async function recalculateEmployeeAttendanceForPeriod(employeeId: string,
       conversionTable,
       approvedLeave,
       isCurrentDayPast5PM: isPast5PM(record.date),
+    absencePenaltyAmount: rules.absencePenaltyAmount,
     });
 
     // Update database

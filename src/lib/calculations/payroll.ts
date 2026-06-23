@@ -9,6 +9,7 @@ export type PayrollSource = {
   absenceDayValue?: number;
   lwopDayValue?: number;
   dayValue: number;
+  amountOverride?: number;
 };
 
 export function deduplicatePayrollSources(sources: PayrollSource[]) {
@@ -20,6 +21,17 @@ export function deduplicatePayrollSources(sources: PayrollSource[]) {
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
 
+export function describeAttendancePenalty(input: { status: string; lateMinutes: number; undertimeMinutes: number; penaltyUnits: number }) {
+  if (input.status === "ABSENT") return "Absence without approved leave";
+  if (input.penaltyUnits > 0) return `${input.penaltyUnits} completed 8-hour late penalty unit(s)`;
+  if (input.lateMinutes > 0 && input.undertimeMinutes > 0) return "Late and undertime recorded (no deduction)";
+  if (input.lateMinutes > 0) return "Late minutes recorded (below 8-hour threshold)";
+  return "Undertime recorded (no deduction)";
+}
+
+export function getPayrollSourceAmount(source: PayrollSource, dailyRate: number) {
+  return Number((source.amountOverride ?? dailyRate * source.dayValue).toFixed(2));
+}
 export function summarizePayrollSources(monthlySalary: number, workingDaysPerMonth: number, sources: PayrollSource[]) {
   const rows = deduplicatePayrollSources(sources);
   const dailyRate = workingDaysPerMonth > 0 ? monthlySalary / workingDaysPerMonth : 0;
@@ -35,7 +47,7 @@ export function summarizePayrollSources(monthlySalary: number, workingDaysPerMon
     dailyRate: Number(dailyRate.toFixed(2)),
     ...totals,
     dayValue: Number(totals.dayValue.toFixed(3)),
-    amount: Number((dailyRate * totals.dayValue).toFixed(2)),
+    amount: Number(rows.reduce((sum, row) => sum + getPayrollSourceAmount(row, dailyRate), 0).toFixed(2)),
   };
 }
 

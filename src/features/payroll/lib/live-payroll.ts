@@ -6,6 +6,8 @@ import {
   calculateOvertimePay,
   calculatePayrollTotals,
   calculateProratedBasicPay,
+  describeAttendancePenalty,
+  getPayrollSourceAmount,
   summarizePayrollSources,
   type PayrollSource,
 } from "@/lib/calculations/payroll";
@@ -182,7 +184,7 @@ export async function buildLivePayroll(
 
     const dayValue =
       record.status === "ABSENT" ? 1 : Number(record.deductionDayValue);
-    if (dayValue <= 0) continue;
+    if (dayValue <= 0 && record.lateMinutes <= 0 && record.undertimeMinutes <= 0) continue;
     sources.push({
       date: record.date,
       source: "ATTENDANCE",
@@ -190,10 +192,13 @@ export async function buildLivePayroll(
       undertimeMinutes: record.undertimeMinutes,
       absenceDayValue: record.status === "ABSENT" ? 1 : 0,
       dayValue,
-      description:
-        record.status === "ABSENT"
-          ? "Absence without approved leave"
-          : "Tardiness and undertime",
+      amountOverride: Number(record.deductionAmount),
+      description: describeAttendancePenalty({
+        status: record.status,
+        lateMinutes: record.lateMinutes,
+        undertimeMinutes: record.undertimeMinutes,
+        penaltyUnits: dayValue,
+      }),
     });
   }
 
@@ -312,7 +317,7 @@ export async function buildLivePayroll(
         absenceDayValue: row.absenceDayValue ?? 0,
         lwopDayValue: row.lwopDayValue ?? 0,
         dayValue: row.dayValue,
-        amount: Number((deductionSummary.dailyRate * row.dayValue).toFixed(2)),
+        amount: getPayrollSourceAmount(row, deductionSummary.dailyRate),
       };
     }),
     overtimeRows,

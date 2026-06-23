@@ -25,7 +25,8 @@ export function PrintPayslipButton({ payroll }: { payroll: LivePayrollResult }) 
       worksheet.addRow(["Gross pay", payroll.earnings.grossPay]);
       worksheet.addRow([]);
       worksheet.addRow(["Deductions", "Amount"]);
-      worksheet.addRow(["Late and undertime", deductionPart(payroll, "time")]);
+      worksheet.addRow(["Late threshold penalties", deductionPart(payroll, "late")]);
+      worksheet.addRow(["Undertime (no deduction)", 0]);
       worksheet.addRow(["Absence", deductionPart(payroll, "absence")]);
       worksheet.addRow(["Leave without pay", deductionPart(payroll, "lwop")]);
       worksheet.addRow(["Total deductions", payroll.deductions.total]);
@@ -34,7 +35,7 @@ export function PrintPayslipButton({ payroll }: { payroll: LivePayrollResult }) 
       if (payroll.deductionRows.length) {
         worksheet.addRow([]);
         worksheet.addRow(["Deduction breakdown"]);
-        worksheet.addRow(["Date", "Reason", "Late minutes", "Undertime minutes", "Absence days", "LWOP days", "Day value", "Amount"]);
+        worksheet.addRow(["Date", "Reason", "Late minutes", "Undertime minutes", "Absence days", "LWOP days", "Penalty units", "Amount"]);
         payroll.deductionRows.forEach((row) => {
           worksheet.addRow([row.date, row.description, row.lateMinutes, row.undertimeMinutes, row.absenceDayValue, row.lwopDayValue, row.dayValue, row.amount]);
         });
@@ -84,10 +85,10 @@ export function PrintPayslipButton({ payroll }: { payroll: LivePayrollResult }) 
   );
 }
 
-function deductionPart(payroll: LivePayrollResult, kind: "time" | "absence" | "lwop") {
+function deductionPart(payroll: LivePayrollResult, kind: "late" | "absence" | "lwop") {
   return payroll.deductionRows
-    .filter((row) => kind === "time"
-      ? row.lateMinutes > 0 || row.undertimeMinutes > 0
+    .filter((row) => kind === "late"
+      ? row.lateMinutes > 0 && row.absenceDayValue === 0 && row.lwopDayValue === 0
       : kind === "absence"
         ? row.absenceDayValue > 0
         : row.lwopDayValue > 0)

@@ -22,11 +22,11 @@ test("CSC credits support full, partial, and half-day interpolation", () => {
 });
 
 test("payroll sources deduplicate employee dates", () => {
-  const sources = deduplicatePayrollSources([{ date: "2026-06-01", source: "LEAVE_WITHOUT_PAY", dayValue: 1, lwopDayValue: 1 }, { date: "2026-06-01", source: "ATTENDANCE", dayValue: 1, absenceDayValue: 1 }]);
+  const sources = deduplicatePayrollSources([{ date: "2026-06-01", source: "LEAVE_WITHOUT_PAY", dayValue: 1, lwopDayValue: 1 }, { date: "2026-06-01", source: "ATTENDANCE", dayValue: 1, absenceDayValue: 1, amountOverride: 500 }]);
   assert.equal(sources.length, 1);
   assert.equal(sources[0].source, "ATTENDANCE");
   const summary = summarizePayrollSources(22_000, 22, sources);
-  assert.equal(summary.amount, 1000);
+  assert.equal(summary.amount, 500);
 });
 
 test("basic pay uses schedule days and prorates partial service", () => {

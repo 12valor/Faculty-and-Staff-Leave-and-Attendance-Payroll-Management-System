@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 
 import { payrollPeriodSchema, type PayrollPeriodValues } from "@/features/payroll/schemas/payroll-schema";
-import { summarizePayrollSources, type PayrollSource } from "@/lib/calculations/payroll";
+import { describeAttendancePenalty, getPayrollSourceAmount, summarizePayrollSources, type PayrollSource } from "@/lib/calculations/payroll";
 import { createAuditLog } from "@/lib/audit";
 import { requireCurrentAdmin } from "@/lib/auth/current-admin";
 import { getPrisma } from "@/lib/prisma";
@@ -51,13 +51,13 @@ async function buildPayrollPreview(periodId: string): Promise<{ period: { id: st
         sources.push({ date: record.date, source: "ATTENDANCE", attendanceRecordId: record.id, leaveAllocationId: allocation.id, lateMinutes: 0, undertimeMinutes: 0, lwopDayValue: unpaid, dayValue: unpaid, description: "Approved unpaid leave" }); continue;
       }
       const dayValue = record.status === "ABSENT" ? 1 : Number(record.deductionDayValue);
-      if (dayValue <= 0) continue;
-      sources.push({ date: record.date, source: "ATTENDANCE", attendanceRecordId: record.id, lateMinutes: record.lateMinutes, undertimeMinutes: record.undertimeMinutes, absenceDayValue: record.status === "ABSENT" ? 1 : 0, dayValue, description: record.status === "ABSENT" ? "Absence without approved leave" : "Tardiness and undertime" });
+      if (dayValue <= 0 && record.lateMinutes <= 0 && record.undertimeMinutes <= 0) continue;
+      sources.push({ date: record.date, source: "ATTENDANCE", attendanceRecordId: record.id, lateMinutes: record.lateMinutes, undertimeMinutes: record.undertimeMinutes, absenceDayValue: record.status === "ABSENT" ? 1 : 0, dayValue, amountOverride: Number(record.deductionAmount), description: describeAttendancePenalty({ status: record.status, lateMinutes: record.lateMinutes, undertimeMinutes: record.undertimeMinutes, penaltyUnits: dayValue }) });
     }
     for (const allocation of allocations.filter((row) => row.employeeId === employee.id && Number(row.unpaidDayValue) > 0 && !attendanceDates.has(row.date))) sources.push({ date: allocation.date, source: "LEAVE_WITHOUT_PAY", leaveAllocationId: allocation.id, lwopDayValue: Number(allocation.unpaidDayValue), dayValue: Number(allocation.unpaidDayValue), description: "Approved unpaid leave without attendance entry" });
     const summary = summarizePayrollSources(Number(employee.monthlySalary), rules.workingDaysPerMonth, sources);
-    return { employeeId: employee.id, employee: `${employee.lastName}, ${employee.firstName}`, monthlySalary: Number(employee.monthlySalary), dailyRate: summary.dailyRate, totalLateMinutes: summary.lateMinutes, totalUndertimeMinutes: summary.undertimeMinutes, absenceDays: summary.absenceDays, lwopDays: summary.lwopDays, dayValue: summary.dayValue, amount: summary.amount, breakdowns: summary.rows.map((row) => { const source = sources.find((item) => item.date === row.date && item.source === row.source)!; return { ...source, amount: Number((summary.dailyRate * source.dayValue).toFixed(2)) }; }) };
-  }).filter((row) => row.dayValue > 0) };
+    return { employeeId: employee.id, employee: `${employee.lastName}, ${employee.firstName}`, monthlySalary: Number(employee.monthlySalary), dailyRate: summary.dailyRate, totalLateMinutes: summary.lateMinutes, totalUndertimeMinutes: summary.undertimeMinutes, absenceDays: summary.absenceDays, lwopDays: summary.lwopDays, dayValue: summary.dayValue, amount: summary.amount, breakdowns: summary.rows.map((row) => { const source = sources.find((item) => item.date === row.date && item.source === row.source)!; return { ...source, amount: getPayrollSourceAmount(source, summary.dailyRate) }; }) };
+  }).filter((row) => row.amount > 0 || row.totalLateMinutes > 0 || row.totalUndertimeMinutes > 0) };
 }
 
 export async function previewPayrollAction(periodId: string) {
