@@ -1,5 +1,6 @@
 import AccessTimeFilledRoundedIcon from "@mui/icons-material/AccessTimeFilledRounded";
 import EventAvailableRoundedIcon from "@mui/icons-material/EventAvailableRounded";
+import EventBusyRoundedIcon from "@mui/icons-material/EventBusyRounded";
 import GroupsRoundedIcon from "@mui/icons-material/GroupsRounded";
 import PaymentsRoundedIcon from "@mui/icons-material/PaymentsRounded";
 import { Badge } from "@/components/ui/badge";
@@ -34,6 +35,7 @@ type DashboardData = {
   trend: Array<{ day: string; present: number; absent: number }>;
   deductions: DeductionRow[];
   today: string;
+  employeesOnLeaveToday: number;
 };
 
 export function DashboardOverview({ data }: { data: DashboardData }) {
@@ -57,12 +59,10 @@ export function DashboardOverview({ data }: { data: DashboardData }) {
       icon: AccessTimeFilledRoundedIcon,
     },
     {
-      label: "Current deductions",
-      value: `₱${data.deductionTotal.toLocaleString(undefined, {
-        minimumFractionDigits: 2,
-      })}`,
-      detail: "Recorded attendance deductions",
-      icon: PaymentsRoundedIcon,
+      label: "On leave today",
+      value: String(data.employeesOnLeaveToday),
+      detail: "Approved leave applications",
+      icon: EventBusyRoundedIcon,
     },
   ];
   const leaveTotal = data.leaveStatuses.reduce(
