@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { NativeSelect, NativeSelectOption } from "@/components/ui/native-select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createWorkbook } from "@/lib/export/excel";
+import { getReportExportRows, getReportFilename, toCsv } from "@/features/reports/lib/report-export";
 
 import {
   AttendanceReportTable,
@@ -141,59 +142,16 @@ export function ReportsDashboard({
 
   // CSV Exporter
   const handleExportCSV = () => {
-    const filename = `Report_${currentTab}_${currentFrom}_to_${currentTo}`;
-    let headers: string[] = [];
-    let rows: string[][] = [];
+    const filename = getReportFilename(currentTab, currentFrom, currentTo);
+    const { headers, rows } = getReportExportRows(currentTab, {
+      attendanceData,
+      leaveData,
+      payrollData,
+      employeeData,
+    });
+    const csvContent = toCsv(headers, rows);
 
-    if (currentTab === "attendance") {
-      headers = ["Employee Name", "Employee Type", "Date", "Time In", "Time Out", "Status"];
-      rows = attendanceData.map((row) => [
-        row.employeeName,
-        row.employeeType,
-        row.date,
-        row.timeIn || "—",
-        row.timeOut || "—",
-        row.status + (row.isStatusOverridden ? " (Override)" : ""),
-      ]);
-    } else if (currentTab === "leave") {
-      headers = ["Employee Name", "Leave Type", "Start Date", "End Date", "Reason", "Status"];
-      rows = leaveData.map((row) => [
-        row.employeeName,
-        row.leaveType,
-        row.startDate,
-        row.endDate,
-        row.reason || "—",
-        row.status,
-      ]);
-    } else if (currentTab === "payroll") {
-      headers = ["Employee Name", "Employee Type", "Pay Period", "Basic Pay", "Deductions", "Net Pay"];
-      rows = payrollData.map((row) => [
-        row.employeeName,
-        row.employeeType,
-        row.payPeriod,
-        row.basicPay.toFixed(2),
-        row.deductions.toFixed(2),
-        row.netPay.toFixed(2),
-      ]);
-    } else if (currentTab === "employee") {
-      headers = ["Employee Name", "Employee Type", "Department", "Position", "Status", "Total Attendance Records", "Total Leaves"];
-      rows = employeeData.map((row) => [
-        row.employeeName,
-        row.employeeType,
-        row.departmentName,
-        row.positionName,
-        row.status,
-        row.totalAttendance.toString(),
-        row.totalLeaves.toString(),
-      ]);
-    }
-
-    const csvContent = [
-      headers.join(","),
-      ...rows.map((row) => row.map((val) => `"${val.replace(/"/g, '""')}"`).join(",")),
-    ].join("\n");
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob([`\uFEFF${csvContent}`], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
@@ -202,11 +160,12 @@ export function ReportsDashboard({
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
   };
 
   // Excel Exporter using dynamic ExcelJS workbook helper
   const handleExportExcel = async () => {
-    const filename = `Report_${currentTab}_${currentFrom}_to_${currentTo}`;
+    const filename = getReportFilename(currentTab, currentFrom, currentTo);
     const sheetName = `${currentTab.charAt(0).toUpperCase() + currentTab.slice(1)} Report`;
     let headers: string[] = [];
     let rows: Array<Array<string | number>> = [];
@@ -441,19 +400,19 @@ export function ReportsDashboard({
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Report Actions:</span>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button onClick={handlePrint} variant="outline" size="sm">
+          <Button type="button" onClick={handlePrint} variant="outline" size="sm">
             <PrintRoundedIcon className="size-4 mr-1.5" />
             Print Report
           </Button>
-          <Button onClick={handlePrint} variant="outline" size="sm">
+          <Button type="button" onClick={handlePrint} variant="outline" size="sm">
             <PictureAsPdfRoundedIcon className="size-4 mr-1.5" />
             Export to PDF
           </Button>
-          <Button onClick={handleExportCSV} variant="outline" size="sm">
+          <Button type="button" onClick={handleExportCSV} variant="outline" size="sm">
             <TableChartRoundedIcon className="size-4 mr-1.5" />
             Export CSV
           </Button>
-          <Button onClick={handleExportExcel} variant="secondary" size="sm">
+          <Button type="button" onClick={handleExportExcel} variant="secondary" size="sm">
             <TableChartRoundedIcon className="size-4 mr-1.5" />
             Export Excel
           </Button>

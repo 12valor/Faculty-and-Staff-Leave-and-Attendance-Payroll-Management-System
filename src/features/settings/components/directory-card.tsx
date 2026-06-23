@@ -1,41 +1,55 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { saveDepartmentAction, savePositionAction, toggleDepartmentAction, togglePositionAction } from "@/features/settings/actions";
 
 type DirectoryRow = { id: string; name: string; description: string | null; isActive: boolean };
+type DirectoryAction = "save" | "toggle";
+type DirectoryResult = { ok: true } | { ok: false; error: string };
+
 const SERVER_ACTION_ERROR = "The server connection was interrupted. Refresh the page and try again.";
 
 export function DirectoryCard({ title, description, rows, kind }: { title: string; description: string; rows: DirectoryRow[]; kind: "department" | "position" }) {
-  const saveAction = kind === "department" ? saveDepartmentAction : savePositionAction;
-  const toggleAction = kind === "department" ? toggleDepartmentAction : togglePositionAction;
+  const router = useRouter();
 
-  async function handleSave(formData: FormData) {
+  async function submitDirectory(formData: FormData, action: DirectoryAction) {
+    const body = new FormData();
+    formData.forEach((value, key) => body.append(key, value));
+    body.set("kind", kind);
+    body.set("action", action);
+
     try {
-      const result = await saveAction(formData);
-      if (result && !result.ok) {
-        toast.error(result.error);
-      } else {
+      const response = await fetch("/api/settings/directory", {
+        method: "POST",
+        body,
+      });
+      const result = await response.json() as DirectoryResult;
+
+      if (!response.ok || !result.ok) {
+        toast.error(result.ok ? SERVER_ACTION_ERROR : result.error);
+        return;
+      }
+
+      if (action === "save") {
         toast.success(`${title.slice(0, -1)} saved.`);
       }
+      router.refresh();
     } catch {
       toast.error(SERVER_ACTION_ERROR);
     }
   }
 
+  async function handleSave(formData: FormData) {
+    await submitDirectory(formData, "save");
+  }
+
   async function handleToggle(formData: FormData) {
-    try {
-      const result = await toggleAction(formData);
-      if (result && !result.ok) {
-        toast.error(result.error);
-      }
-    } catch {
-      toast.error(SERVER_ACTION_ERROR);
-    }
+    await submitDirectory(formData, "toggle");
   }
 
   return (
