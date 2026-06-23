@@ -96,19 +96,7 @@ export function AppShell({ children, admin }: AppShellProps) {
           </p>
           <Navigation />
         </div>
-        <div className="border-t p-4">
-          <div className="rounded-xl border border-primary/10 bg-secondary/65 p-3.5">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-primary shadow-[0_0_0_3px_rgb(200_16_46/0.1)]" />
-              <p className="text-xs font-semibold text-secondary-foreground">
-                Local database
-              </p>
-            </div>
-            <p className="mt-2 text-[0.7rem] leading-5 text-muted-foreground">
-              Records stay securely on this computer through SQLite.
-            </p>
-          </div>
-        </div>
+
       </aside>
 
       <div className="lg:pl-[17rem]">
