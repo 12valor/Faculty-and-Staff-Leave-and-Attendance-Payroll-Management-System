@@ -1,4 +1,4 @@
-﻿# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies
 /node_modules
@@ -53,3 +53,20 @@ prisma/dev.db*
 
 # local QA artifacts
 /.tmp/
+
+# IDE / Editors
+/.vscode/
+/.idea/
+*.swp
+*.swo
+
+# Local agent / tool metadata
+/.agents/
+/.codex/
+/.gemini/
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
