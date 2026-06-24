@@ -4,7 +4,7 @@ A local-first, single-Admin system for faculty and staff records, schedules, att
 
 ---
 
-## 🛠️ Quick Start Guide (Windows)
+## Quick Start Guide (Windows)
 
 The system includes an automatic launcher (`run.bat`) that handles the entire setup (installing dependencies, configuring environment variables, setting up the SQLite database, applying schema migrations, seeding the initial admin account, and opening the browser).
 
@@ -45,7 +45,7 @@ To run this application, you only need to download and install **Node.js**:
 
 ---
 
-## 💻 Developer Setup (Manual)
+## Developer Setup (Manual)
 
 If you are on macOS/Linux or prefer setting up the system manually for development:
 
@@ -73,7 +73,7 @@ If you are on macOS/Linux or prefer setting up the system manually for developme
 
 ---
 
-## 🔑 Default Credentials
+## Default Credentials
 
 Once the system starts, you can log in using the default administrator credentials:
 - **Username**: `admin`
@@ -81,7 +81,7 @@ Once the system starts, you can log in using the default administrator credentia
 
 *(Note: You can change the admin username and password from the system settings after logging in.)*
 
-## 📦 Included Modules
+## Included Modules
 
 - **Authentication & Security**: Signed 8-hour Admin session and protected workspace routes.
 - **Organization & Rules**: Departments, positions, payroll rules, and view-only CSC tables.
